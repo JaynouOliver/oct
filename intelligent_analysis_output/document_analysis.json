@@ -1,0 +1,1505 @@
+{
+  "document_info": {
+    "file_path": "financial_reasoning.pdf",
+    "file_name": "financial_reasoning.pdf",
+    "file_size": 346591,
+    "parsed_at": "2025-08-31T10:28:02.922595",
+    "parser_version": "intelligent_document_parser_v1.0"
+  },
+  "extraction_methods": {
+    "traditional_parsing": true,
+    "vlm_enhancement": true,
+    "image_analysis": true
+  },
+  "content": {
+    "text": {
+      "raw_text": "Enabling Equitable Access to Trustworthy Financial Reasoning William Jurayj1, Nils Holzenberger2, Benjamin Van Durme1 1Johns Hopkins University 2T\u00b4el\u00b4ecom Paris, Institut Polytechnique de Paris wjurayj1@jhu.edu 5 2 0 2 g u A 8 2 ] L C . s c [ 1 v 1 5 0 1 2 . 8 0 5 2 : v i X r a Abstract According to the United States Internal Revenue Service, \"the average American spends $270 and 13 hours filing their taxes\". Even beyond the U.S., tax filing requires complex rea- soning, combining application of overlapping rules with nu- merical calculations. Because errors can incur costly penal- ties, any automated system must deliver high accuracy and auditability, making modern large language models (LLMs) poorly suited for this task. We propose an approach that inte- grates LLMs with a symbolic solver to calculate tax obliga- tions. We evaluate variants of this system on the challeng- ing StAtutory Reasoning Assessment (SARA) dataset, and include a novel method for estimating the cost of deploying such a system based on real-world penalties for tax errors. We further show how combining up-front translation of plain-text rules into formal logic programs, combined with intelligently retrieved exemplars for formal case representations, can dra- matically improve performance on this task and reduce costs to well below real-world averages. Our results demonstrate the promise and economic feasibility of neuro-symbolic ar- chitectures for increasing equitable access to reliable tax as- sistance. Introduction \"GPT is not a certified tax professional, nor am I, so you should always check with your tax advisor.\" -- Greg Brockman, CTO of OpenAI Of life's two certainties, taxes should be preferred; yet they may well be the more complicated one. Each year, virtually every adult in the world must calculate and pay a fee to some government, in order to reside and earn a living within the state's guardianship. Even for individu- als with relatively simple financial situations, the annual filing process demands meticulous reading and following of dozens of form instructions and the copying of values across schedules, worksheets, and eligibility tests. Com- pleting these tasks without professional assistance can take hours. Alternatively, taxpayers may hire a professional pre- parer, incurring substantial fees depending on the complex- ity of their return (Internal Revenue Service 2025). Accuracy in tax filing is essential. Over-reported income or missed deduction opportunities lead to unnecessary over- payment, while under-reporting may result in penalties, interest, and potential legal consequences. In the United States, the costs of inaccuracies affect lower income commu- nities more significantly, in part because these groups offer the Internal Revenue Service (IRS) high audit success rates (Black et al. 2022; Elzayn et al. 2025). However, these audits deliver a modest return on investment compared to audits of wealthier taxpayers, so there is an opportunity to better align community and institutional interests through improved tax advice to lower income taxpayers (Boning et al. 2024). Figure 1: A taxpayer confronted with a tax question might choose between an inexpensive AI preparer and a costlier human professional. The decision considers trade-offs be- tween cost, convenience, and confidence in the result. However, the concrete costs for errors present a substan- tial challenge for modern large language models (LLMs). An AI assistant deployed in this domain must meet higher standards than basic accuracy: it should (1) recognize when it lacks sufficient certainty to offer guidance and (2) gener- ate a transparent and faithful trace of logical steps so that taxpayers and auditors can easily verify the derivation of each answer. In this paper we show that symbolic reason- ing tools, integrated with LLMs, offer a promising approach to meeting these standards. Our method provides the lan- guage model with access to a symbolic solver, enabling it to translate statutory text and taxpayer information into formal logic programs, which are processed by a trusted execution engine. We evaluate the method on the StAtutory Reason- ing Assessment (SARA) dataset, a benchmark of synthetic tax scenarios paired with liability calculations carried out through ground-truth representations of rules and facts in formal logic (Holzenberger et al. 2020). Our experiments demonstrate two key findings. First, Figure 2: Methods for solving. Top Left: Plain-text for statutes and a case is fed into a language model, along with the instruction to calculate a person's tax obligation. Top Right: Statutes and a case are fed into the model as before, but it is instructed to convert these into a logic program which calculates a person's tax obligation. If the SWI-Prolog engine fails to execute the program, the case is considered unanswered. Bottom: A language model parses a case's facts into Prolog, conditioned on gold parses of the most relevant cases and of the rules contained in the statutes. The symbolic solver imports the gold parses of the statutes before attempting to execute the generated parse of the case. Note that unlike the approaches above it, this requires gold symbolic representations of both the statutes and a representative selection of correctly-decided cases. frontier reasoning models outperform non- whereas reasoning models at both directly solving and at parsing case and statute text into the symbolic solver, non-reasoning models consistently outperform their reasoning counterparts when given gold symbolic representations of statutes and of their application to similar cases. Second, we show that by adding additional refusal criteria through a symbolic solver and self-checking, the expected costs of deploying such a system in the real world could be brought down to less than 20% of the average cost for an American to file their taxes. Our results indicate the promise of neuro-symbolic architectures for expanding access to trustworthy and reliable tax expertise. Background Logic Programming for Legal Reasoning Several programming languages have been designed to rep- resent and facilitate logical reasoning. Prolog is a declara- tive programming language for representing and reasoning over knowledge, with roots in first order logic. A program- mer defines rules using Horn clauses (Horn 1951) and facts by declaring which rules apply to entities, thus populating a knowledge base. Subsequently, this knowledge base can be queried by defining a \u2018goal', which launches computation in the form of a backward-chaining search attempting to prove that the goal holds a certain value (Wielemaker et al. 2010). Prolog has been used since the early days of legal AI, where it has formed the backbone of legal expert systems because its declarative syntax keeps knowledge base entries for rules human-readable while powerfully representing the reason- ing around which legal questions revolve (Sherman 1989). Efforts in countries like the United Kingdom (Sergot et al. 1986), Canada (Sherman 1987), and the United States (Kant et al. 2025) have leveraged this capacity to encode legal rules in executable formal logic. Related languages have also been used in the legal domain, such as Answer-set Programming (Gelfond and Lifschitz 1988; Morris 2020), Datalog (Ceri et al. 1989; Huang et al. 2021), and Catala (Merigoux et al. 2021a; Merigoux 2023). More broadly, hierarchical tem- plates are a popular tool for evaluation of legal reasoning (Hou et al. 2024). We focus on the SARA dataset (Holzen- berger et al. 2020), which encodes statutes and cases into Prolog logic programs to show how a symbolic expert sys- tem can perfectly solve a task which large language models struggle to complete. Statutory Tax Reasoning and the SARA Dataset We focus on the task of statutory reasoning for tax law. Some elements of this task bear similarity to popular math- ematical reasoning tasks such as GSM-8k (Cobbe et al. 2021) or MATH-500 (Hendrycks et al. 2021), such as chain- ing together mathematical operations to solve a real-world problem described in words. However, unlike these math datasets which require application of a small set of universal arithmetic rules which models learn during training, statu- tory reasoning considers a set of contingent rules contained within documents provided to a model in-context at infer- ence time, in addition to these basic arithmetic principles. We evaluate our methods on the SARA dataset, which that govern all calculation. For each case in this setting, a model's context is filled with all sections of the statutes con- catenated together, the description of the case's facts, and the question about a person in that case's tax liability, all in plain text. It is instructed to calculate the person in question's tax obligation based on the rules outlined in the statutes. Reasoning Model Chat Model Qwen2.5-Coder R1-Distill Qwen2.5 R1-Distill Llama 3.3 Llama 3.3 DeepSeek-R1 DeepSeek-V3 OpenAI o3 GPT-4.1 Size 32 billion 70 billion 671 billion $8/m tokens Table 1: Chat and Reasoning model pairs. Each open- weight model pair is fine-tuned from the same base model. Although the exact dimensions and provenance of OpenAI's models are unknown, the two models have identical token pricing structures, suggesting that they incur similar costs for OpenAI to serve. Calculation by Parsing for a Symbolic Solver To extend the direct solution approach, we augment the lan- guage model with a symbolic solver. Here, a model is given the plain text of the statutes as in the direct calculation case. It is instructed to generate a Prolog program which encodes the relevant rules and facts necessary to compute the per- son in question's tax obligation. The symbolic solver ingests a set of rules and facts in Prolog, and is invoked to exe- cute a query. The execution of this Prolog program offers a straightforward mechanism for refusal: if the program fails to execute into the proper format or hangs beyond a pre- allocated time limit (10 seconds), the system is considered to have refused to answer. Experimental Setup We run experiments across four model families of different sizes, three of which are open-weight models. The bases for these models are: Qwen2.5 32B (Qwen et al. 2025), Llama 3.3 70B (Grattafiori et al. 2024), DeepSeek-V3 671B (DeepSeek-AI et al. 2025b), and OpenAI's GPT-4.1 (Ope- nAI 2025a,b), each of which has an instruction-tuned ver- sion designed for common chat applications, and a reason- ing version optimized to expend additional inference-time compute to solve harder problems. The full list of models is included in table 1. We run auxiliary experiments using GPT-5, but we do not conduct the same chat vs. reasoning comparison because this product appears to be an integrated system containing several models, and therefore is not as analogous to these other comparisons (Zhang et al. 2025). The reasoning model for three of these pairings stem from the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where strong base models were fine-tuned to generate long chains- of-thought that help them solve harder quantitative reason- ing problems. Although there is no formal documentation stating that OpenAI's GPT-4.1 and o3 models are derived from the same base model, the proximity of the two model's launch dates and their identical per-token pricing schemes Figure 3: Number of correct and incorrect solutions pro- duced by each solution method, large chat- and reasoning-optimized models (served by DeepSeek and Ope- nAI). for tests the ability of language models to do statutory reasoning about the United States Tax Code (Holzenberger et al. 2020). This dataset is included in the popular aggregate benchmark LegalBench (Guha et al. 2023), and was used in the GPT- 4 product launch to highlight the model's superior reason- ing capacity (Blair-Stanek et al. 2024). The SARA dataset consists of 9 sections from the US federal tax code which have been moderately edited to make them self-contained and unambiguous. These manipulations allow the dataset to serve as a self-contained and solvable task for language models that lack live internet access and human-like abili- ties to process ambiguity (Jurayj et al. 2022; Stengel-Eskin et al. 2024). These statute sections are accompanied by 376 hand-crafted cases to test understanding of these statutes, each containing a question about a person's tax obligation. Each statute and case has been manually translated into Pro- log, which allows them to be trivially solved using the lan- guage's powerful execution engine to resolve queries about cases. This Prolog is defined using neo-Davidsonian event semantics (Davidson 1966), thus categorizing each event as one of 61 possible predicates onto which various arguments are attached. Of the 376 cases and corresponding questions, 276 require binary judgments about whether a statute ap- plies to a given case, and 100 require numerical judgments about how much tax a person owes in a given year. We focus on these 100 tax cases because of their increased difficulty, and because a trivial baseline of always guessing a single an- swer delivers poor performance at predicting the numerical output. Zero-Shot Solving from Statutory Text Direct Calculation We evaluate our methods against the baseline method of di- rect solving, mirroring the approach used in OpenAI's GPT- 4 demonstration (Blair-Stanek et al. 2024). This approach treats the tax calculation as a mathematical question answer- ing task with the additional demand that the model must apply entries from a large corpus of rules contained in the statutory text, in addition to the generic arithmetic rules Model Family Baseline Qwen-2.5 Llama-3.3 DeepSeek OpenAI GPT-4.1 OpenAI GPT-5 Method Model Always Abstain N/A Always Predict $0 N/A Direct Qwen-32b Parsed Qwen-32b Direct R1-32b Parsed R1-32b Direct Llama-70b Parsed Llama-70b Direct R1-70b R1-70b Parsed DeepSeek-V3 Direct DeepSeek-V3 Parsed DeepSeek-V3 Direct + Direct DeepSeek-V3 Direct + Parsed Parsed + Parsed DeepSeek-V3 DeepSeek-R1 Direct DeepSeek-R1 Parsed DeepSeek-R1 Direct + Direct DeepSeek-R1 Direct + Parsed Parsed + Parsed DeepSeek-R1 Direct GPT-4.1 Parsed GPT-4.1 Direct + Direct GPT-4.1 Direct + Parsed GPT-4.1 Parsed + Parsed GPT-4.1 Direct o3 Parsed o3 Direct + Direct o3 Direct + Parsed o3 Parsed + Parsed o3 Direct GPT-5 Parsed GPT-5 Direct + Direct GPT-5 Direct + Parsed GPT-5 Parsed + Parsed GPT-5 Correct 0 5 13 2 38 1 9 1 43 2 22 11 16 7 5 74 38 66 34 17 48 39 42 27 26 56 75 41 52 65 76 53 73 46 31 Incorrect Abstentions 0 95 87 17 62 2 91 43 57 1 78 43 15 4 8 26 10 12 3 4 52 31 13 6 5 44 15 17 10 9 24 13 9 6 5 100 0 0 81 0 97 0 56 0 97 0 46 69 89 87 0 52 22 63 79 0 30 45 67 69 0 10 42 38 26 0 34 18 48 64 Break-Even Price $270 \u00b1 0 $16227.11 \u00b1 7805.94 $3,051.64 \u00b1 1,828.31 $490.34 \u00b1 230.75 $505.25 \u00b1 287.67 $278.70 \u00b1 24.33 $1,065.90 \u00b1 675.07 $252,027.73 \u00b1 414,049.97 $1,257.03 \u00b1 1,620.47 $266.10 \u00b1 6.81 $739.45 \u00b1 474.59 $2,099.13 \u00b1 1,253.57 $265.46 \u00b1 63.53 $285.53 \u00b1 55.57 $310.47 \u00b1 67.95 $304.29 \u00b1 225.57 $249.64 \u00b1 84.77 $94.20 \u00b1 59.76 $170.10 \u00b1 21.75 $241.80 \u00b1 29.45 $532.84 \u00b1 492.99 $228.89 \u00b1 151.69 $196.92 \u00b1 88.43 $185.10 \u00b1 21.33 $186.30 \u00b1 20.84 $6,431.84 \u00b1 2,637.94 $47.43 \u00b1 22.16 $3,472.29 \u00b1 1,859.32 $115.90 \u00b1 24.63 $77.51 \u00b1 22.41 $299.11 \u00b1 288.41 $122.72 \u00b1 29.21 $218.64 \u00b1 270.19 $138.30 \u00b1 25.53 $180.23 \u00b1 23.42 Table 2: Results of different methods without gold statutes. Models in the same family have the same base model (or seem most likely to, in the case of closed-weights models). Note that \"break-even price\" measures only the costs of failures and abstentions, and does not include inference costs. For each model, the approach that delivered the lowest break-even price is shown in bold. The top two rows show the break-even price of trivial systems, which always defer to an expert or which always tell a person not to pay any taxes. Errors represent a 90% confidence interval. The lowest break-even price method for each model family is in bold. suggest that these two models have a similar relationship to the other model pairs we explore. We consider \u2018correct\u2018 attempts to be those where the out- put calculated by our system is exactly the same as the ac- tual tax obligation, when rounded to the nearest dollar. All Prolog code is executed using the SWI-Prolog (Wielemaker et al. 2010) implementation of Prolog, and externally halted after 10 seconds of reasoning. We run experiments on the v2 release of the SARA dataset, because its programmatic rep- resentations most closely match the natural language surface forms (Holzenberger and Van Durme 2021). Self-Consistency Tests We further ask how effectively these methods can serve to improve each other's selectivity, by using comparisons be- tween different solution methods to expend additional com- pute to help determine whether an answer should be trusted (Wang et al. 2023; Stengel-Eskin and Van Durme 2023; Ju- rayj et al. 2025). In these settings, an answer is only ac- cepted if it is reached via two independent reasoning pro- cesses: two chains-of-thought and answers (either directly calculated obligations or Prolog programs) are sampled from the same model. When self-checking using the same method (for instance, \"Parsed + Parsed\"), these answers are condi- tioned on the same prompt and context. In the parsing-based",
+      "cleaned_text": "Enabling Equitable Access to Trustworthy Financial Reasoning William Jurayj1, Nils Holzenberger2, Benjamin Van Durme1 1Johns Hopkins University 2T\u00b4el\u00b4ecom Paris, Institut Polytechnique de Paris wjurayj1@jhu.edu 5 2 0 2 g u A 8 2 ] L C . s c [ 1 v 1 5 0 1 2 . 8 0 5 2 : v i X r a Abstract According to the United States Internal Revenue Service, \"the average American spends $270 and 13 hours filing their taxes\". Even beyond the U.S., tax filing requires complex rea- soning, combining application of overlapping rules with nu- merical calculations. Because errors can incur costly penal- ties, any automated system must deliver high accuracy and auditability, making modern large language models (LLMs) poorly suited for this task. We propose an approach that inte- grates LLMs with a symbolic solver to calculate tax obliga- tions. We evaluate variants of this system on the challeng- ing StAtutory Reasoning Assessment (SARA) dataset, and include a novel method for estimating the cost of deploying such a system based on real-world penalties for tax errors. We further show how combining up-front translation of plain-text rules into formal logic programs, combined with intelligently retrieved exemplars for formal case representations, can dra- matically improve performance on this task and reduce costs to well below real-world averages. Our results demonstrate the promise and economic feasibility of neuro-symbolic ar- chitectures for increasing equitable access to reliable tax as- sistance. Introduction \"GPT is not a certified tax professional, nor am I, so you should always check with your tax advisor.\" -- Greg Brockman, CTO of OpenAI Of life's two certainties, taxes should be preferred; yet they may well be the more complicated one. Each year, virtually every adult in the world must calculate and pay a fee to some government, in order to reside and earn a living within the state's guardianship. Even for individu- als with relatively simple financial situations, the annual filing process demands meticulous reading and following of dozens of form instructions and the copying of values across schedules, worksheets, and eligibility tests. Com- pleting these tasks without professional assistance can take hours. Alternatively, taxpayers may hire a professional pre- parer, incurring substantial fees depending on the complex- ity of their return (Internal Revenue Service 2025). Accuracy in tax filing is essential. Over-reported income or missed deduction opportunities lead to unnecessary over- payment, while under-reporting may result in penalties, interest, and potential legal consequences. In the United States, the costs of inaccuracies affect lower income commu- nities more significantly, in part because these groups offer the Internal Revenue Service (IRS) high audit success rates (Black et al. 2022; Elzayn et al. 2025). However, these audits deliver a modest return on investment compared to audits of wealthier taxpayers, so there is an opportunity to better align community and institutional interests through improved tax advice to lower income taxpayers (Boning et al. 2024). Figure 1: A taxpayer confronted with a tax question might choose between an inexpensive AI preparer and a costlier human professional. The decision considers trade-offs be- tween cost, convenience, and confidence in the result. However, the concrete costs for errors present a substan- tial challenge for modern large language models (LLMs). An AI assistant deployed in this domain must meet higher standards than basic accuracy: it should (1) recognize when it lacks sufficient certainty to offer guidance and (2) gener- ate a transparent and faithful trace of logical steps so that taxpayers and auditors can easily verify the derivation of each answer. In this paper we show that symbolic reason- ing tools, integrated with LLMs, offer a promising approach to meeting these standards. Our method provides the lan- guage model with access to a symbolic solver, enabling it to translate statutory text and taxpayer information into formal logic programs, which are processed by a trusted execution engine. We evaluate the method on the StAtutory Reason- ing Assessment (SARA) dataset, a benchmark of synthetic tax scenarios paired with liability calculations carried out through ground-truth representations of rules and facts in formal logic (Holzenberger et al. 2020). Our experiments demonstrate two key findings. First, Figure 2: Methods for solving. Top Left: Plain-text for statutes and a case is fed into a language model, along with the instruction to calculate a person's tax obligation. Top Right: Statutes and a case are fed into the model as before, but it is instructed to convert these into a logic program which calculates a person's tax obligation. If the SWI-Prolog engine fails to execute the program, the case is considered unanswered. Bottom: A language model parses a case's facts into Prolog, conditioned on gold parses of the most relevant cases and of the rules contained in the statutes. The symbolic solver imports the gold parses of the statutes before attempting to execute the generated parse of the case. Note that unlike the approaches above it, this requires gold symbolic representations of both the statutes and a representative selection of correctly-decided cases. frontier reasoning models outperform non- whereas reasoning models at both directly solving and at parsing case and statute text into the symbolic solver, non-reasoning models consistently outperform their reasoning counterparts when given gold symbolic representations of statutes and of their application to similar cases. Second, we show that by adding additional refusal criteria through a symbolic solver and self-checking, the expected costs of deploying such a system in the real world could be brought down to less than 20% of the average cost for an American to file their taxes. Our results indicate the promise of neuro-symbolic architectures for expanding access to trustworthy and reliable tax expertise. Background Logic Programming for Legal Reasoning Several programming languages have been designed to rep- resent and facilitate logical reasoning. Prolog is a declara- tive programming language for representing and reasoning over knowledge, with roots in first order logic. A program- mer defines rules using Horn clauses (Horn 1951) and facts by declaring which rules apply to entities, thus populating a knowledge base. Subsequently, this knowledge base can be queried by defining a \u2018goal', which launches computation in the form of a backward-chaining search attempting to prove that the goal holds a certain value (Wielemaker et al. 2010). Prolog has been used since the early days of legal AI, where it has formed the backbone of legal expert systems because its declarative syntax keeps knowledge base entries for rules human-readable while powerfully representing the reason- ing around which legal questions revolve (Sherman 1989). Efforts in countries like the United Kingdom (Sergot et al. 1986), Canada (Sherman 1987), and the United States (Kant et al. 2025) have leveraged this capacity to encode legal rules in executable formal logic. Related languages have also been used in the legal domain, such as Answer-set Programming (Gelfond and Lifschitz 1988; Morris 2020), Datalog (Ceri et al. 1989; Huang et al. 2021), and Catala (Merigoux et al. 2021a; Merigoux 2023). More broadly, hierarchical tem- plates are a popular tool for evaluation of legal reasoning (Hou et al. 2024). We focus on the SARA dataset (Holzen- berger et al. 2020), which encodes statutes and cases into Prolog logic programs to show how a symbolic expert sys- tem can perfectly solve a task which large language models struggle to complete. Statutory Tax Reasoning and the SARA Dataset We focus on the task of statutory reasoning for tax law. Some elements of this task bear similarity to popular math- ematical reasoning tasks such as GSM-8k (Cobbe et al. 2021) or MATH-500 (Hendrycks et al. 2021), such as chain- ing together mathematical operations to solve a real-world problem described in words. However, unlike these math datasets which require application of a small set of universal arithmetic rules which models learn during training, statu- tory reasoning considers a set of contingent rules contained within documents provided to a model in-context at infer- ence time, in addition to these basic arithmetic principles. We evaluate our methods on the SARA dataset, which that govern all calculation. For each case in this setting, a model's context is filled with all sections of the statutes con- catenated together, the description of the case's facts, and the question about a person in that case's tax liability, all in plain text. It is instructed to calculate the person in question's tax obligation based on the rules outlined in the statutes. Reasoning Model Chat Model Qwen2.5-Coder R1-Distill Qwen2.5 R1-Distill Llama 3.3 Llama 3.3 DeepSeek-R1 DeepSeek-V3 OpenAI o3 GPT-4.1 Size 32 billion 70 billion 671 billion $8/m tokens Table 1: Chat and Reasoning model pairs. Each open- weight model pair is fine-tuned from the same base model. Although the exact dimensions and provenance of OpenAI's models are unknown, the two models have identical token pricing structures, suggesting that they incur similar costs for OpenAI to serve. Calculation by Parsing for a Symbolic Solver To extend the direct solution approach, we augment the lan- guage model with a symbolic solver. Here, a model is given the plain text of the statutes as in the direct calculation case. It is instructed to generate a Prolog program which encodes the relevant rules and facts necessary to compute the per- son in question's tax obligation. The symbolic solver ingests a set of rules and facts in Prolog, and is invoked to exe- cute a query. The execution of this Prolog program offers a straightforward mechanism for refusal: if the program fails to execute into the proper format or hangs beyond a pre- allocated time limit (10 seconds), the system is considered to have refused to answer. Experimental Setup We run experiments across four model families of different sizes, three of which are open-weight models. The bases for these models are: Qwen2.5 32B (Qwen et al. 2025), Llama 3.3 70B (Grattafiori et al. 2024), DeepSeek-V3 671B (DeepSeek-AI et al. 2025b), and OpenAI's GPT-4.1 (Ope- nAI 2025a,b), each of which has an instruction-tuned ver- sion designed for common chat applications, and a reason- ing version optimized to expend additional inference-time compute to solve harder problems. The full list of models is included in table 1. We run auxiliary experiments using GPT-5, but we do not conduct the same chat vs. reasoning comparison because this product appears to be an integrated system containing several models, and therefore is not as analogous to these other comparisons (Zhang et al. 2025). The reasoning model for three of these pairings stem from the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where strong base models were fine-tuned to generate long chains- of-thought that help them solve harder quantitative reason- ing problems. Although there is no formal documentation stating that OpenAI's GPT-4.1 and o3 models are derived from the same base model, the proximity of the two model's launch dates and their identical per-token pricing schemes Figure 3: Number of correct and incorrect solutions pro- duced by each solution method, large chat- and reasoning-optimized models (served by DeepSeek and Ope- nAI). for tests the ability of language models to do statutory reasoning about the United States Tax Code (Holzenberger et al. 2020). This dataset is included in the popular aggregate benchmark LegalBench (Guha et al. 2023), and was used in the GPT- 4 product launch to highlight the model's superior reason- ing capacity (Blair-Stanek et al. 2024). The SARA dataset consists of 9 sections from the US federal tax code which have been moderately edited to make them self-contained and unambiguous. These manipulations allow the dataset to serve as a self-contained and solvable task for language models that lack live internet access and human-like abili- ties to process ambiguity (Jurayj et al. 2022; Stengel-Eskin et al. 2024). These statute sections are accompanied by 376 hand-crafted cases to test understanding of these statutes, each containing a question about a person's tax obligation. Each statute and case has been manually translated into Pro- log, which allows them to be trivially solved using the lan- guage's powerful execution engine to resolve queries about cases. This Prolog is defined using neo-Davidsonian event semantics (Davidson 1966), thus categorizing each event as one of 61 possible predicates onto which various arguments are attached. Of the 376 cases and corresponding questions, 276 require binary judgments about whether a statute ap- plies to a given case, and 100 require numerical judgments about how much tax a person owes in a given year. We focus on these 100 tax cases because of their increased difficulty, and because a trivial baseline of always guessing a single an- swer delivers poor performance at predicting the numerical output. Zero-Shot Solving from Statutory Text Direct Calculation We evaluate our methods against the baseline method of di- rect solving, mirroring the approach used in OpenAI's GPT- 4 demonstration (Blair-Stanek et al. 2024). This approach treats the tax calculation as a mathematical question answer- ing task with the additional demand that the model must apply entries from a large corpus of rules contained in the statutory text, in addition to the generic arithmetic rules Model Family Baseline Qwen-2.5 Llama-3.3 DeepSeek OpenAI GPT-4.1 OpenAI GPT-5 Method Model Always Abstain N/A Always Predict $0 N/A Direct Qwen-32b Parsed Qwen-32b Direct R1-32b Parsed R1-32b Direct Llama-70b Parsed Llama-70b Direct R1-70b R1-70b Parsed DeepSeek-V3 Direct DeepSeek-V3 Parsed DeepSeek-V3 Direct + Direct DeepSeek-V3 Direct + Parsed Parsed + Parsed DeepSeek-V3 DeepSeek-R1 Direct DeepSeek-R1 Parsed DeepSeek-R1 Direct + Direct DeepSeek-R1 Direct + Parsed Parsed + Parsed DeepSeek-R1 Direct GPT-4.1 Parsed GPT-4.1 Direct + Direct GPT-4.1 Direct + Parsed GPT-4.1 Parsed + Parsed GPT-4.1 Direct o3 Parsed o3 Direct + Direct o3 Direct + Parsed o3 Parsed + Parsed o3 Direct GPT-5 Parsed GPT-5 Direct + Direct GPT-5 Direct + Parsed GPT-5 Parsed + Parsed GPT-5 Correct 0 5 13 2 38 1 9 1 43 2 22 11 16 7 5 74 38 66 34 17 48 39 42 27 26 56 75 41 52 65 76 53 73 46 31 Incorrect Abstentions 0 95 87 17 62 2 91 43 57 1 78 43 15 4 8 26 10 12 3 4 52 31 13 6 5 44 15 17 10 9 24 13 9 6 5 100 0 0 81 0 97 0 56 0 97 0 46 69 89 87 0 52 22 63 79 0 30 45 67 69 0 10 42 38 26 0 34 18 48 64 Break-Even Price $270 \u00b1 0 $16227.11 \u00b1 7805.94 $3,051.64 \u00b1 1,828.31 $490.34 \u00b1 230.75 $505.25 \u00b1 287.67 $278.70 \u00b1 24.33 $1,065.90 \u00b1 675.07 $252,027.73 \u00b1 414,049.97 $1,257.03 \u00b1 1,620.47 $266.10 \u00b1 6.81 $739.45 \u00b1 474.59 $2,099.13 \u00b1 1,253.57 $265.46 \u00b1 63.53 $285.53 \u00b1 55.57 $310.47 \u00b1 67.95 $304.29 \u00b1 225.57 $249.64 \u00b1 84.77 $94.20 \u00b1 59.76 $170.10 \u00b1 21.75 $241.80 \u00b1 29.45 $532.84 \u00b1 492.99 $228.89 \u00b1 151.69 $196.92 \u00b1 88.43 $185.10 \u00b1 21.33 $186.30 \u00b1 20.84 $6,431.84 \u00b1 2,637.94 $47.43 \u00b1 22.16 $3,472.29 \u00b1 1,859.32 $115.90 \u00b1 24.63 $77.51 \u00b1 22.41 $299.11 \u00b1 288.41 $122.72 \u00b1 29.21 $218.64 \u00b1 270.19 $138.30 \u00b1 25.53 $180.23 \u00b1 23.42 Table 2: Results of different methods without gold statutes. Models in the same family have the same base model (or seem most likely to, in the case of closed-weights models). Note that \"break-even price\" measures only the costs of failures and abstentions, and does not include inference costs. For each model, the approach that delivered the lowest break-even price is shown in bold. The top two rows show the break-even price of trivial systems, which always defer to an expert or which always tell a person not to pay any taxes. Errors represent a 90% confidence interval. The lowest break-even price method for each model family is in bold. suggest that these two models have a similar relationship to the other model pairs we explore. We consider \u2018correct\u2018 attempts to be those where the out- put calculated by our system is exactly the same as the ac- tual tax obligation, when rounded to the nearest dollar. All Prolog code is executed using the SWI-Prolog (Wielemaker et al. 2010) implementation of Prolog, and externally halted after 10 seconds of reasoning. We run experiments on the v2 release of the SARA dataset, because its programmatic rep- resentations most closely match the natural language surface forms (Holzenberger and Van Durme 2021). Self-Consistency Tests We further ask how effectively these methods can serve to improve each other's selectivity, by using comparisons be- tween different solution methods to expend additional com- pute to help determine whether an answer should be trusted (Wang et al. 2023; Stengel-Eskin and Van Durme 2023; Ju- rayj et al. 2025). In these settings, an answer is only ac- cepted if it is reached via two independent reasoning pro- cesses: two chains-of-thought and answers (either directly calculated obligations or Prolog programs) are sampled from the same model. When self-checking using the same method (for instance, \"Parsed + Parsed\"), these answers are condi- tioned on the same prompt and context. In the parsing-based",
+      "word_count": 2801,
+      "character_count": 17399
+    },
+    "tables": {
+      "count": 4,
+      "data": [
+        {
+          "data": [
+            {
+              "Chat Model": "Qwen2.5-Coder",
+              "Reasoning Model": "R1-Distill Qwen2.5",
+              "Size": "32 billion"
+            },
+            {
+              "Chat Model": "Llama 3.3",
+              "Reasoning Model": "R1-Distill Llama 3.3",
+              "Size": "70 billion"
+            },
+            {
+              "Chat Model": "DeepSeek-V3",
+              "Reasoning Model": "DeepSeek-R1",
+              "Size": "671 billion"
+            },
+            {
+              "Chat Model": "GPT-4.1",
+              "Reasoning Model": "OpenAI o3",
+              "Size": "$8/m tokens"
+            }
+          ],
+          "shape": [
+            4,
+            3
+          ],
+          "confidence": 0.8
+        },
+        {
+          "data": [
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "This dataset is included in the popular aggregate benchmark",
+              "Unnamed: 0": "Calculation by Parsing for a Symbolic Solver"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "LegalBench (Guha et al. 2023), and was used in the GPT-",
+              "Unnamed: 0": "To extend the direct solution approach, we augment the lan-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "4 product launch to highlight the model\u2019s superior reason-",
+              "Unnamed: 0": "guage model with a symbolic solver. Here, a model is given"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "ing capacity (Blair-Stanek et al. 2024). The SARA dataset",
+              "Unnamed: 0": "the plain text of the statutes as in the direct calculation case."
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "consists of 9 sections from the US federal tax code which",
+              "Unnamed: 0": "It is instructed to generate a Prolog program which encodes"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "have been moderately edited to make them self-contained",
+              "Unnamed: 0": "the relevant rules and facts necessary to compute the per-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "and unambiguous. These manipulations allow the dataset",
+              "Unnamed: 0": "son in question\u2019s tax obligation. The symbolic solver ingests"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "to serve as a self-contained and solvable task for language",
+              "Unnamed: 0": "a set of rules and facts in Prolog, and is invoked to exe-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "models that lack live internet access and human-like abili-",
+              "Unnamed: 0": "cute a query. The execution of this Prolog program offers a"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "ties to process ambiguity (Jurayj et al. 2022; Stengel-Eskin",
+              "Unnamed: 0": "straightforward mechanism for refusal: if the program fails"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "et al. 2024). These statute sections are accompanied by 376",
+              "Unnamed: 0": "to execute into the proper format or hangs beyond a pre-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "hand-crafted cases to test understanding of these statutes,",
+              "Unnamed: 0": "allocated time limit (10 seconds), the system is considered"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "each containing a question about a person\u2019s tax obligation.",
+              "Unnamed: 0": "to have refused to answer."
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "Each statute and case has been manually translated into Pro-",
+              "Unnamed: 0": null
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "log, which allows them to be trivially solved using the lan-",
+              "Unnamed: 0": "Experimental Setup"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "guage\u2019s powerful execution engine to resolve queries about",
+              "Unnamed: 0": null
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "cases. This Prolog is defined using neo-Davidsonian event",
+              "Unnamed: 0": "We run experiments across four model families of different"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "semantics (Davidson 1966), thus categorizing each event as",
+              "Unnamed: 0": "sizes, three of which are open-weight models. The bases"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "one of 61 possible predicates onto which various arguments",
+              "Unnamed: 0": "for these models are: Qwen2.5 32B (Qwen et al. 2025),"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "are attached. Of the 376 cases and corresponding questions,",
+              "Unnamed: 0": "Llama 3.3 70B (Grattafiori et al. 2024), DeepSeek-V3 671B"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "276 require binary judgments about whether a statute ap-",
+              "Unnamed: 0": "(DeepSeek-AI et al. 2025b), and OpenAI\u2019s GPT-4.1 (Ope-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "plies to a given case, and 100 require numerical judgments",
+              "Unnamed: 0": "nAI 2025a,b), each of which has an instruction-tuned ver-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "about how much tax a person owes in a given year. We focus",
+              "Unnamed: 0": "sion designed for common chat applications, and a reason-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "on these 100 tax cases because of their increased difficulty,",
+              "Unnamed: 0": "ing version optimized to expend additional inference-time"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "and because a trivial baseline of always guessing a single an-",
+              "Unnamed: 0": "compute to solve harder problems. The full list of models"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "swer delivers poor performance at predicting the numerical",
+              "Unnamed: 0": "is included in table 1. We run auxiliary experiments using"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "output.",
+              "Unnamed: 0": "GPT-5, but we do not conduct the same chat vs. reasoning"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": null,
+              "Unnamed: 0": "comparison because this product appears to be an integrated"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "Zero-Shot Solving from Statutory Text",
+              "Unnamed: 0": "system containing several models, and therefore is not as"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": null,
+              "Unnamed: 0": "analogous to these other comparisons (Zhang et al. 2025)."
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "Direct Calculation",
+              "Unnamed: 0": "The reasoning model for three of these pairings stem from"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "We evaluate our methods against the baseline method of di-",
+              "Unnamed: 0": "the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "rect solving, mirroring the approach used in OpenAI\u2019s GPT-",
+              "Unnamed: 0": "strong base models were fine-tuned to generate long chains-"
+            },
+            {
+              "about the United States Tax Code (Holzenberger et al. 2020).": "4 demonstration (Blair-Stanek et al. 2024). This approach",
+              "Unnamed: 0": "of-thought that help them solve harder quantitative reason-"
+            }
+          ],
+          "shape": [
+            34,
+            2
+          ],
+          "confidence": 0.8
+        },
+        {
+          "data": [
+            {
+              "Unnamed: 0": "Direct Calculation",
+              "analogous to these other comparisons (Zhang et al. 2025).": "The reasoning model for three of these pairings stem from"
+            },
+            {
+              "Unnamed: 0": "We evaluate our methods against the baseline method of di-",
+              "analogous to these other comparisons (Zhang et al. 2025).": "the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where"
+            },
+            {
+              "Unnamed: 0": "rect solving, mirroring the approach used in OpenAI\u2019s GPT-",
+              "analogous to these other comparisons (Zhang et al. 2025).": "strong base models were fine-tuned to generate long chains-"
+            },
+            {
+              "Unnamed: 0": "4 demonstration (Blair-Stanek et al. 2024). This approach",
+              "analogous to these other comparisons (Zhang et al. 2025).": "of-thought that help them solve harder quantitative reason-"
+            },
+            {
+              "Unnamed: 0": "treats the tax calculation as a mathematical question answer-",
+              "analogous to these other comparisons (Zhang et al. 2025).": "ing problems. Although there is no formal documentation"
+            },
+            {
+              "Unnamed: 0": "ing task with the additional demand that the model must",
+              "analogous to these other comparisons (Zhang et al. 2025).": "stating that OpenAI\u2019s GPT-4.1 and o3 models are derived"
+            },
+            {
+              "Unnamed: 0": "apply entries from a large corpus of rules contained in the",
+              "analogous to these other comparisons (Zhang et al. 2025).": "from the same base model, the proximity of the two model\u2019s"
+            },
+            {
+              "Unnamed: 0": "statutory text, in addition to the generic arithmetic rules",
+              "analogous to these other comparisons (Zhang et al. 2025).": "launch dates and their identical per-token pricing schemes"
+            }
+          ],
+          "shape": [
+            8,
+            2
+          ],
+          "confidence": 0.8
+        },
+        {
+          "data": [
+            {
+              "Model Family": null,
+              "Model": "N/A",
+              "Method": "Always Abstain",
+              "Correct": 0.0,
+              "Incorrect": 0.0,
+              "Abstentions": 100.0,
+              "Break-Even Price": "$270 \u00b1 0"
+            },
+            {
+              "Model Family": "Baseline",
+              "Model": null,
+              "Method": null,
+              "Correct": null,
+              "Incorrect": null,
+              "Abstentions": null,
+              "Break-Even Price": null
+            },
+            {
+              "Model Family": null,
+              "Model": "N/A",
+              "Method": "Always Predict $0",
+              "Correct": 5.0,
+              "Incorrect": 95.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$16227.11 \u00b1 7805.94"
+            },
+            {
+              "Model Family": null,
+              "Model": "Qwen-32b",
+              "Method": "Direct",
+              "Correct": 13.0,
+              "Incorrect": 87.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$3,051.64 \u00b1 1,828.31"
+            },
+            {
+              "Model Family": null,
+              "Model": "Qwen-32b",
+              "Method": "Parsed",
+              "Correct": 2.0,
+              "Incorrect": 17.0,
+              "Abstentions": 81.0,
+              "Break-Even Price": "$490.34 \u00b1 230.75"
+            },
+            {
+              "Model Family": "Qwen-2.5",
+              "Model": null,
+              "Method": null,
+              "Correct": null,
+              "Incorrect": null,
+              "Abstentions": null,
+              "Break-Even Price": null
+            },
+            {
+              "Model Family": null,
+              "Model": "R1-32b",
+              "Method": "Direct",
+              "Correct": 38.0,
+              "Incorrect": 62.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$505.25 \u00b1 287.67"
+            },
+            {
+              "Model Family": null,
+              "Model": "R1-32b",
+              "Method": "Parsed",
+              "Correct": 1.0,
+              "Incorrect": 2.0,
+              "Abstentions": 97.0,
+              "Break-Even Price": "$278.70 \u00b1 24.33"
+            },
+            {
+              "Model Family": null,
+              "Model": "Llama-70b",
+              "Method": "Direct",
+              "Correct": 9.0,
+              "Incorrect": 91.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$1,065.90 \u00b1 675.07"
+            },
+            {
+              "Model Family": null,
+              "Model": "Llama-70b",
+              "Method": "Parsed",
+              "Correct": 1.0,
+              "Incorrect": 43.0,
+              "Abstentions": 56.0,
+              "Break-Even Price": "$252,027.73 \u00b1 414,049.97"
+            },
+            {
+              "Model Family": "Llama-3.3",
+              "Model": null,
+              "Method": null,
+              "Correct": null,
+              "Incorrect": null,
+              "Abstentions": null,
+              "Break-Even Price": null
+            },
+            {
+              "Model Family": null,
+              "Model": "R1-70b",
+              "Method": "Direct",
+              "Correct": 43.0,
+              "Incorrect": 57.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$1,257.03 \u00b1 1,620.47"
+            },
+            {
+              "Model Family": null,
+              "Model": "R1-70b",
+              "Method": "Parsed",
+              "Correct": 2.0,
+              "Incorrect": 1.0,
+              "Abstentions": 97.0,
+              "Break-Even Price": "$266.10 \u00b1 6.81"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-V3",
+              "Method": "Direct",
+              "Correct": 22.0,
+              "Incorrect": 78.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$739.45 \u00b1 474.59"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-V3",
+              "Method": "Parsed",
+              "Correct": 11.0,
+              "Incorrect": 43.0,
+              "Abstentions": 46.0,
+              "Break-Even Price": "$2,099.13 \u00b1 1,253.57"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-V3",
+              "Method": "Direct + Direct",
+              "Correct": 16.0,
+              "Incorrect": 15.0,
+              "Abstentions": 69.0,
+              "Break-Even Price": "$265.46 \u00b1 63.53"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-V3",
+              "Method": "Direct + Parsed",
+              "Correct": 7.0,
+              "Incorrect": 4.0,
+              "Abstentions": 89.0,
+              "Break-Even Price": "$285.53 \u00b1 55.57"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-V3",
+              "Method": "Parsed + Parsed",
+              "Correct": 5.0,
+              "Incorrect": 8.0,
+              "Abstentions": 87.0,
+              "Break-Even Price": "$310.47 \u00b1 67.95"
+            },
+            {
+              "Model Family": "DeepSeek",
+              "Model": null,
+              "Method": null,
+              "Correct": null,
+              "Incorrect": null,
+              "Abstentions": null,
+              "Break-Even Price": null
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-R1",
+              "Method": "Direct",
+              "Correct": 74.0,
+              "Incorrect": 26.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$304.29 \u00b1 225.57"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-R1",
+              "Method": "Parsed",
+              "Correct": 38.0,
+              "Incorrect": 10.0,
+              "Abstentions": 52.0,
+              "Break-Even Price": "$249.64 \u00b1 84.77"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-R1",
+              "Method": "Direct + Direct",
+              "Correct": 66.0,
+              "Incorrect": 12.0,
+              "Abstentions": 22.0,
+              "Break-Even Price": "$94.20 \u00b1 59.76"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-R1",
+              "Method": "Direct + Parsed",
+              "Correct": 34.0,
+              "Incorrect": 3.0,
+              "Abstentions": 63.0,
+              "Break-Even Price": "$170.10 \u00b1 21.75"
+            },
+            {
+              "Model Family": null,
+              "Model": "DeepSeek-R1",
+              "Method": "Parsed + Parsed",
+              "Correct": 17.0,
+              "Incorrect": 4.0,
+              "Abstentions": 79.0,
+              "Break-Even Price": "$241.80 \u00b1 29.45"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-4.1",
+              "Method": "Direct",
+              "Correct": 48.0,
+              "Incorrect": 52.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$532.84 \u00b1 492.99"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-4.1",
+              "Method": "Parsed",
+              "Correct": 39.0,
+              "Incorrect": 31.0,
+              "Abstentions": 30.0,
+              "Break-Even Price": "$228.89 \u00b1 151.69"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-4.1",
+              "Method": "Direct + Direct",
+              "Correct": 42.0,
+              "Incorrect": 13.0,
+              "Abstentions": 45.0,
+              "Break-Even Price": "$196.92 \u00b1 88.43"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-4.1",
+              "Method": "Direct + Parsed",
+              "Correct": 27.0,
+              "Incorrect": 6.0,
+              "Abstentions": 67.0,
+              "Break-Even Price": "$185.10 \u00b1 21.33"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-4.1",
+              "Method": "Parsed + Parsed",
+              "Correct": 26.0,
+              "Incorrect": 5.0,
+              "Abstentions": 69.0,
+              "Break-Even Price": "$186.30 \u00b1 20.84"
+            },
+            {
+              "Model Family": "OpenAI GPT-4.1",
+              "Model": null,
+              "Method": null,
+              "Correct": null,
+              "Incorrect": null,
+              "Abstentions": null,
+              "Break-Even Price": null
+            },
+            {
+              "Model Family": null,
+              "Model": "o3",
+              "Method": "Direct",
+              "Correct": 56.0,
+              "Incorrect": 44.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$6,431.84 \u00b1 2,637.94"
+            },
+            {
+              "Model Family": null,
+              "Model": "o3",
+              "Method": "Parsed",
+              "Correct": 75.0,
+              "Incorrect": 15.0,
+              "Abstentions": 10.0,
+              "Break-Even Price": "$47.43 \u00b1 22.16"
+            },
+            {
+              "Model Family": null,
+              "Model": "o3",
+              "Method": "Direct + Direct",
+              "Correct": 41.0,
+              "Incorrect": 17.0,
+              "Abstentions": 42.0,
+              "Break-Even Price": "$3,472.29 \u00b1 1,859.32"
+            },
+            {
+              "Model Family": null,
+              "Model": "o3",
+              "Method": "Direct + Parsed",
+              "Correct": 52.0,
+              "Incorrect": 10.0,
+              "Abstentions": 38.0,
+              "Break-Even Price": "$115.90 \u00b1 24.63"
+            },
+            {
+              "Model Family": null,
+              "Model": "o3",
+              "Method": "Parsed + Parsed",
+              "Correct": 65.0,
+              "Incorrect": 9.0,
+              "Abstentions": 26.0,
+              "Break-Even Price": "$77.51 \u00b1 22.41"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-5",
+              "Method": "Direct",
+              "Correct": 76.0,
+              "Incorrect": 24.0,
+              "Abstentions": 0.0,
+              "Break-Even Price": "$299.11 \u00b1 288.41"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-5",
+              "Method": "Parsed",
+              "Correct": 53.0,
+              "Incorrect": 13.0,
+              "Abstentions": 34.0,
+              "Break-Even Price": "$122.72 \u00b1 29.21"
+            },
+            {
+              "Model Family": "OpenAI GPT-5",
+              "Model": "GPT-5",
+              "Method": "Direct + Direct",
+              "Correct": 73.0,
+              "Incorrect": 9.0,
+              "Abstentions": 18.0,
+              "Break-Even Price": "$218.64 \u00b1 270.19"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-5",
+              "Method": "Direct + Parsed",
+              "Correct": 46.0,
+              "Incorrect": 6.0,
+              "Abstentions": 48.0,
+              "Break-Even Price": "$138.30 \u00b1 25.53"
+            },
+            {
+              "Model Family": null,
+              "Model": "GPT-5",
+              "Method": "Parsed + Parsed",
+              "Correct": 31.0,
+              "Incorrect": 5.0,
+              "Abstentions": 64.0,
+              "Break-Even Price": "$180.23 \u00b1 23.42"
+            }
+          ],
+          "shape": [
+            40,
+            7
+          ],
+          "confidence": 0.8
+        }
+      ]
+    },
+    "images": {
+      "count": 23,
+      "paths": [
+        "financial_reasoning_images/page_1_img_470.png",
+        "financial_reasoning_images/page_1_img_2617.png",
+        "financial_reasoning_images/page_1_img_3044.png",
+        "financial_reasoning_images/page_1_img_3112.png",
+        "financial_reasoning_images/page_2_img_1637.png",
+        "financial_reasoning_images/page_2_img_1942.png",
+        "financial_reasoning_images/page_2_img_2560.png",
+        "financial_reasoning_images/page_2_img_3515.png",
+        "financial_reasoning_images/page_2_img_3527.png",
+        "financial_reasoning_images/page_2_img_3550.png",
+        "financial_reasoning_images/page_2_img_3574.png",
+        "financial_reasoning_images/page_2_img_3575.png",
+        "financial_reasoning_images/page_2_img_3577.png",
+        "financial_reasoning_images/page_2_img_3578.png",
+        "financial_reasoning_images/page_3_img_1700.png",
+        "financial_reasoning_images/page_3_img_4044.png",
+        "financial_reasoning_images/page_3_img_4354.png",
+        "financial_reasoning_images/page_4_img_61.png",
+        "financial_reasoning_images/page_4_img_732.png",
+        "financial_reasoning_images/page_4_img_733.png",
+        "financial_reasoning_images/page_4_img_1698.png",
+        "financial_reasoning_images/page_4_img_1699.png",
+        "financial_reasoning_images/page_4_img_1700.png"
+      ],
+      "descriptions": [
+        {
+          "image_index": 0,
+          "image_path": "financial_reasoning_images/page_1_img_470.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 6.091791152954102
+        },
+        {
+          "image_index": 1,
+          "image_path": "financial_reasoning_images/page_1_img_2617.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 4.708470106124878
+        },
+        {
+          "image_index": 2,
+          "image_path": "financial_reasoning_images/page_1_img_3044.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 4.196013927459717
+        },
+        {
+          "image_index": 3,
+          "image_path": "financial_reasoning_images/page_1_img_3112.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616340000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.048442840576172
+        },
+        {
+          "image_index": 4,
+          "image_path": "financial_reasoning_images/page_2_img_1637.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616340000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.3555047512054443
+        },
+        {
+          "image_index": 5,
+          "image_path": "financial_reasoning_images/page_2_img_1942.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616340000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.8689608573913574
+        },
+        {
+          "image_index": 6,
+          "image_path": "financial_reasoning_images/page_2_img_2560.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616340000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.2079107761383057
+        },
+        {
+          "image_index": 7,
+          "image_path": "financial_reasoning_images/page_2_img_3515.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616340000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.066409111022949
+        },
+        {
+          "image_index": 8,
+          "image_path": "financial_reasoning_images/page_2_img_3527.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.208285093307495
+        },
+        {
+          "image_index": 9,
+          "image_path": "financial_reasoning_images/page_2_img_3550.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.734447956085205
+        },
+        {
+          "image_index": 10,
+          "image_path": "financial_reasoning_images/page_2_img_3574.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.1907901763916016
+        },
+        {
+          "image_index": 11,
+          "image_path": "financial_reasoning_images/page_2_img_3575.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.265887975692749
+        },
+        {
+          "image_index": 12,
+          "image_path": "financial_reasoning_images/page_2_img_3577.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.5670228004455566
+        },
+        {
+          "image_index": 13,
+          "image_path": "financial_reasoning_images/page_2_img_3578.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.327799081802368
+        },
+        {
+          "image_index": 14,
+          "image_path": "financial_reasoning_images/page_3_img_1700.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.5938000679016113
+        },
+        {
+          "image_index": 15,
+          "image_path": "financial_reasoning_images/page_3_img_4044.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.6965749263763428
+        },
+        {
+          "image_index": 16,
+          "image_path": "financial_reasoning_images/page_3_img_4354.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.6618449687957764
+        },
+        {
+          "image_index": 17,
+          "image_path": "financial_reasoning_images/page_4_img_61.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.560825824737549
+        },
+        {
+          "image_index": 18,
+          "image_path": "financial_reasoning_images/page_4_img_732.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.684169292449951
+        },
+        {
+          "image_index": 19,
+          "image_path": "financial_reasoning_images/page_4_img_733.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.127316951751709
+        },
+        {
+          "image_index": 20,
+          "image_path": "financial_reasoning_images/page_4_img_1698.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.2866740226745605
+        },
+        {
+          "image_index": 21,
+          "image_path": "financial_reasoning_images/page_4_img_1699.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-min. ', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '16', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756616400000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.7316699028015137
+        },
+        {
+          "image_index": 22,
+          "image_path": "financial_reasoning_images/page_4_img_1700.png",
+          "description": {
+            "error": "Error code: 429 - {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1756684800000'}, 'provider_name': None}}, 'user_id': 'user_2ugIJsdQHbKSFGUfV37rGjhOayo'}"
+          },
+          "processing_time": 2.2556848526000977
+        }
+      ],
+      "filtering_stats": {
+        "total_images": 27,
+        "document_images": 23,
+        "page_renders_filtered": 4
+      }
+    }
+  },
+  "metadata": {},
+  "summary": {
+    "document_type": "research_paper",
+    "total_pages": 23,
+    "text_statistics": {
+      "word_count": 2801,
+      "character_count": 17399,
+      "has_content": true
+    },
+    "table_statistics": {
+      "total_tables": 4,
+      "has_tables": true
+    },
+    "image_statistics": {
+      "total_images": 23,
+      "described_images": 23,
+      "has_images": true
+    },
+    "enhancement_status": {
+      "vlm_applied": true,
+      "images_analyzed": true
+    }
+  },
+  "rag_chunks": [
+    {
+      "type": "text",
+      "content": "Enabling Equitable Access to Trustworthy Financial Reasoning William Jurayj1, Nils Holzenberger2, Benjamin Van Durme1 1Johns Hopkins University 2T\u00b4el\u00b4ecom Paris, Institut Polytechnique de Paris wjurayj1@jhu.edu 5 2 0 2 g u A 8 2 ] L C . s c [ 1 v 1 5 0 1 2 . 8 0 5 2 : v i X r a Abstract According to the United States Internal Revenue Service, \"the average American spends $270 and 13 hours filing their taxes\". Even beyond the U.S., tax filing requires complex rea- soning, combining application of overlapping rules with nu- merical calculations. Because errors can incur costly penal- ties, any automated system must deliver high accuracy and auditability, making modern large language models (LLMs) poorly suited for this task. We propose an approach that inte- grates LLMs with a symbolic solver to calculate tax obliga- tions. We evaluate variants of this system on the challeng- ing StAtutory Reasoning Assessment (SARA) dataset, and include a novel method for estimating the cost of deploying such a system based on real-world penalties for tax errors. We further show how combining up-front translation of plain-text rules into formal logic programs, combined with intelligently retrieved exemplars for formal case representations, can dra- matically improve performance on this task and reduce costs to well below real-world averages. Our results demonstrate the promise and economic feasibility of neuro-symbolic ar- chitectures for increasing equitable access to reliable tax as- sistance. Introduction \"GPT is not a certified tax professional, nor am I, so you should always check with your tax advisor.\" -- Greg Brockman, CTO of OpenAI Of life's two certainties, taxes should be preferred; yet they may well be the more complicated one. Each year, virtually every adult in the world must calculate and pay a fee to some government, in order to reside and earn a living within the state's guardianship. Even for individu- als with relatively simple financial situations, the annual filing process demands meticulous reading and following of dozens of form instructions and the copying of values across schedules, worksheets, and eligibility tests. Com- pleting these tasks without professional assistance can take hours. Alternatively, taxpayers may hire a professional pre- parer, incurring substantial fees depending on the complex- ity of their return (Internal Revenue Service 2025). Accuracy in tax filing is essential. Over-reported income or missed deduction opportunities lead to unnecessary over- payment, while under-reporting may result in penalties, interest, and potential legal consequences. In the United States, the costs of inaccuracies affect lower income commu- nities more significantly, in part because these groups offer the Internal Revenue Service (IRS) high audit success rates (Black et al. 2022; Elzayn et al. 2025). However, these audits deliver a modest return on investment compared to audits of wealthier taxpayers, so there is an opportunity to better align community and institutional interests through improved tax advice to lower income taxpayers (Boning et al. 2024). Figure 1: A taxpayer confronted with a tax question might choose between an inexpensive AI preparer and a costlier",
+      "chunk_id": "text_1",
+      "word_count": 500,
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "text",
+      "content": "human professional. The decision considers trade-offs be- tween cost, convenience, and confidence in the result. However, the concrete costs for errors present a substan- tial challenge for modern large language models (LLMs). An AI assistant deployed in this domain must meet higher standards than basic accuracy: it should (1) recognize when it lacks sufficient certainty to offer guidance and (2) gener- ate a transparent and faithful trace of logical steps so that taxpayers and auditors can easily verify the derivation of each answer. In this paper we show that symbolic reason- ing tools, integrated with LLMs, offer a promising approach to meeting these standards. Our method provides the lan- guage model with access to a symbolic solver, enabling it to translate statutory text and taxpayer information into formal logic programs, which are processed by a trusted execution engine. We evaluate the method on the StAtutory Reason- ing Assessment (SARA) dataset, a benchmark of synthetic tax scenarios paired with liability calculations carried out through ground-truth representations of rules and facts in formal logic (Holzenberger et al. 2020). Our experiments demonstrate two key findings. First, Figure 2: Methods for solving. Top Left: Plain-text for statutes and a case is fed into a language model, along with the instruction to calculate a person's tax obligation. Top Right: Statutes and a case are fed into the model as before, but it is instructed to convert these into a logic program which calculates a person's tax obligation. If the SWI-Prolog engine fails to execute the program, the case is considered unanswered. Bottom: A language model parses a case's facts into Prolog, conditioned on gold parses of the most relevant cases and of the rules contained in the statutes. The symbolic solver imports the gold parses of the statutes before attempting to execute the generated parse of the case. Note that unlike the approaches above it, this requires gold symbolic representations of both the statutes and a representative selection of correctly-decided cases. frontier reasoning models outperform non- whereas reasoning models at both directly solving and at parsing case and statute text into the symbolic solver, non-reasoning models consistently outperform their reasoning counterparts when given gold symbolic representations of statutes and of their application to similar cases. Second, we show that by adding additional refusal criteria through a symbolic solver and self-checking, the expected costs of deploying such a system in the real world could be brought down to less than 20% of the average cost for an American to file their taxes. Our results indicate the promise of neuro-symbolic architectures for expanding access to trustworthy and reliable tax expertise. Background Logic Programming for Legal Reasoning Several programming languages have been designed to rep- resent and facilitate logical reasoning. Prolog is a declara- tive programming language for representing and reasoning over knowledge, with roots in first order logic. A program- mer defines rules using Horn clauses (Horn 1951) and facts by declaring which rules apply to entities, thus populating a knowledge base. Subsequently, this knowledge base can",
+      "chunk_id": "text_2",
+      "word_count": 500,
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "text",
+      "content": "be queried by defining a \u2018goal', which launches computation in the form of a backward-chaining search attempting to prove that the goal holds a certain value (Wielemaker et al. 2010). Prolog has been used since the early days of legal AI, where it has formed the backbone of legal expert systems because its declarative syntax keeps knowledge base entries for rules human-readable while powerfully representing the reason- ing around which legal questions revolve (Sherman 1989). Efforts in countries like the United Kingdom (Sergot et al. 1986), Canada (Sherman 1987), and the United States (Kant et al. 2025) have leveraged this capacity to encode legal rules in executable formal logic. Related languages have also been used in the legal domain, such as Answer-set Programming (Gelfond and Lifschitz 1988; Morris 2020), Datalog (Ceri et al. 1989; Huang et al. 2021), and Catala (Merigoux et al. 2021a; Merigoux 2023). More broadly, hierarchical tem- plates are a popular tool for evaluation of legal reasoning (Hou et al. 2024). We focus on the SARA dataset (Holzen- berger et al. 2020), which encodes statutes and cases into Prolog logic programs to show how a symbolic expert sys- tem can perfectly solve a task which large language models struggle to complete. Statutory Tax Reasoning and the SARA Dataset We focus on the task of statutory reasoning for tax law. Some elements of this task bear similarity to popular math- ematical reasoning tasks such as GSM-8k (Cobbe et al. 2021) or MATH-500 (Hendrycks et al. 2021), such as chain- ing together mathematical operations to solve a real-world problem described in words. However, unlike these math datasets which require application of a small set of universal arithmetic rules which models learn during training, statu- tory reasoning considers a set of contingent rules contained within documents provided to a model in-context at infer- ence time, in addition to these basic arithmetic principles. We evaluate our methods on the SARA dataset, which that govern all calculation. For each case in this setting, a model's context is filled with all sections of the statutes con- catenated together, the description of the case's facts, and the question about a person in that case's tax liability, all in plain text. It is instructed to calculate the person in question's tax obligation based on the rules outlined in the statutes. Reasoning Model Chat Model Qwen2.5-Coder R1-Distill Qwen2.5 R1-Distill Llama 3.3 Llama 3.3 DeepSeek-R1 DeepSeek-V3 OpenAI o3 GPT-4.1 Size 32 billion 70 billion 671 billion $8/m tokens Table 1: Chat and Reasoning model pairs. Each open- weight model pair is fine-tuned from the same base model. Although the exact dimensions and provenance of OpenAI's models are unknown, the two models have identical token pricing structures, suggesting that they incur similar costs for OpenAI to serve. Calculation by Parsing for a Symbolic Solver To extend the direct solution approach, we augment the lan- guage model with a symbolic solver. Here, a model is given the plain text of the statutes as in the direct calculation case. It",
+      "chunk_id": "text_3",
+      "word_count": 500,
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "text",
+      "content": "is instructed to generate a Prolog program which encodes the relevant rules and facts necessary to compute the per- son in question's tax obligation. The symbolic solver ingests a set of rules and facts in Prolog, and is invoked to exe- cute a query. The execution of this Prolog program offers a straightforward mechanism for refusal: if the program fails to execute into the proper format or hangs beyond a pre- allocated time limit (10 seconds), the system is considered to have refused to answer. Experimental Setup We run experiments across four model families of different sizes, three of which are open-weight models. The bases for these models are: Qwen2.5 32B (Qwen et al. 2025), Llama 3.3 70B (Grattafiori et al. 2024), DeepSeek-V3 671B (DeepSeek-AI et al. 2025b), and OpenAI's GPT-4.1 (Ope- nAI 2025a,b), each of which has an instruction-tuned ver- sion designed for common chat applications, and a reason- ing version optimized to expend additional inference-time compute to solve harder problems. The full list of models is included in table 1. We run auxiliary experiments using GPT-5, but we do not conduct the same chat vs. reasoning comparison because this product appears to be an integrated system containing several models, and therefore is not as analogous to these other comparisons (Zhang et al. 2025). The reasoning model for three of these pairings stem from the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where strong base models were fine-tuned to generate long chains- of-thought that help them solve harder quantitative reason- ing problems. Although there is no formal documentation stating that OpenAI's GPT-4.1 and o3 models are derived from the same base model, the proximity of the two model's launch dates and their identical per-token pricing schemes Figure 3: Number of correct and incorrect solutions pro- duced by each solution method, large chat- and reasoning-optimized models (served by DeepSeek and Ope- nAI). for tests the ability of language models to do statutory reasoning about the United States Tax Code (Holzenberger et al. 2020). This dataset is included in the popular aggregate benchmark LegalBench (Guha et al. 2023), and was used in the GPT- 4 product launch to highlight the model's superior reason- ing capacity (Blair-Stanek et al. 2024). The SARA dataset consists of 9 sections from the US federal tax code which have been moderately edited to make them self-contained and unambiguous. These manipulations allow the dataset to serve as a self-contained and solvable task for language models that lack live internet access and human-like abili- ties to process ambiguity (Jurayj et al. 2022; Stengel-Eskin et al. 2024). These statute sections are accompanied by 376 hand-crafted cases to test understanding of these statutes, each containing a question about a person's tax obligation. Each statute and case has been manually translated into Pro- log, which allows them to be trivially solved using the lan- guage's powerful execution engine to resolve queries about cases. This Prolog is defined using neo-Davidsonian event semantics (Davidson 1966), thus categorizing each event as one of 61",
+      "chunk_id": "text_4",
+      "word_count": 500,
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "text",
+      "content": "possible predicates onto which various arguments are attached. Of the 376 cases and corresponding questions, 276 require binary judgments about whether a statute ap- plies to a given case, and 100 require numerical judgments about how much tax a person owes in a given year. We focus on these 100 tax cases because of their increased difficulty, and because a trivial baseline of always guessing a single an- swer delivers poor performance at predicting the numerical output. Zero-Shot Solving from Statutory Text Direct Calculation We evaluate our methods against the baseline method of di- rect solving, mirroring the approach used in OpenAI's GPT- 4 demonstration (Blair-Stanek et al. 2024). This approach treats the tax calculation as a mathematical question answer- ing task with the additional demand that the model must apply entries from a large corpus of rules contained in the statutory text, in addition to the generic arithmetic rules Model Family Baseline Qwen-2.5 Llama-3.3 DeepSeek OpenAI GPT-4.1 OpenAI GPT-5 Method Model Always Abstain N/A Always Predict $0 N/A Direct Qwen-32b Parsed Qwen-32b Direct R1-32b Parsed R1-32b Direct Llama-70b Parsed Llama-70b Direct R1-70b R1-70b Parsed DeepSeek-V3 Direct DeepSeek-V3 Parsed DeepSeek-V3 Direct + Direct DeepSeek-V3 Direct + Parsed Parsed + Parsed DeepSeek-V3 DeepSeek-R1 Direct DeepSeek-R1 Parsed DeepSeek-R1 Direct + Direct DeepSeek-R1 Direct + Parsed Parsed + Parsed DeepSeek-R1 Direct GPT-4.1 Parsed GPT-4.1 Direct + Direct GPT-4.1 Direct + Parsed GPT-4.1 Parsed + Parsed GPT-4.1 Direct o3 Parsed o3 Direct + Direct o3 Direct + Parsed o3 Parsed + Parsed o3 Direct GPT-5 Parsed GPT-5 Direct + Direct GPT-5 Direct + Parsed GPT-5 Parsed + Parsed GPT-5 Correct 0 5 13 2 38 1 9 1 43 2 22 11 16 7 5 74 38 66 34 17 48 39 42 27 26 56 75 41 52 65 76 53 73 46 31 Incorrect Abstentions 0 95 87 17 62 2 91 43 57 1 78 43 15 4 8 26 10 12 3 4 52 31 13 6 5 44 15 17 10 9 24 13 9 6 5 100 0 0 81 0 97 0 56 0 97 0 46 69 89 87 0 52 22 63 79 0 30 45 67 69 0 10 42 38 26 0 34 18 48 64 Break-Even Price $270 \u00b1 0 $16227.11 \u00b1 7805.94 $3,051.64 \u00b1 1,828.31 $490.34 \u00b1 230.75 $505.25 \u00b1 287.67 $278.70 \u00b1 24.33 $1,065.90 \u00b1 675.07 $252,027.73 \u00b1 414,049.97 $1,257.03 \u00b1 1,620.47 $266.10 \u00b1 6.81 $739.45 \u00b1 474.59 $2,099.13 \u00b1 1,253.57 $265.46 \u00b1 63.53 $285.53 \u00b1 55.57 $310.47 \u00b1 67.95 $304.29 \u00b1 225.57 $249.64 \u00b1 84.77 $94.20 \u00b1 59.76 $170.10 \u00b1 21.75 $241.80 \u00b1 29.45 $532.84 \u00b1 492.99 $228.89 \u00b1 151.69 $196.92 \u00b1 88.43 $185.10 \u00b1 21.33 $186.30 \u00b1 20.84 $6,431.84 \u00b1 2,637.94 $47.43 \u00b1 22.16 $3,472.29 \u00b1 1,859.32 $115.90 \u00b1 24.63 $77.51 \u00b1 22.41 $299.11 \u00b1 288.41 $122.72 \u00b1 29.21 $218.64 \u00b1 270.19 $138.30 \u00b1 25.53 $180.23 \u00b1 23.42 Table 2: Results of different methods without gold statutes. Models in the same family have the same base model (or",
+      "chunk_id": "text_5",
+      "word_count": 500,
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "text",
+      "content": "seem most likely to, in the case of closed-weights models). Note that \"break-even price\" measures only the costs of failures and abstentions, and does not include inference costs. For each model, the approach that delivered the lowest break-even price is shown in bold. The top two rows show the break-even price of trivial systems, which always defer to an expert or which always tell a person not to pay any taxes. Errors represent a 90% confidence interval. The lowest break-even price method for each model family is in bold. suggest that these two models have a similar relationship to the other model pairs we explore. We consider \u2018correct\u2018 attempts to be those where the out- put calculated by our system is exactly the same as the ac- tual tax obligation, when rounded to the nearest dollar. All Prolog code is executed using the SWI-Prolog (Wielemaker et al. 2010) implementation of Prolog, and externally halted after 10 seconds of reasoning. We run experiments on the v2 release of the SARA dataset, because its programmatic rep- resentations most closely match the natural language surface forms (Holzenberger and Van Durme 2021). Self-Consistency Tests We further ask how effectively these methods can serve to improve each other's selectivity, by using comparisons be- tween different solution methods to expend additional com- pute to help determine whether an answer should be trusted (Wang et al. 2023; Stengel-Eskin and Van Durme 2023; Ju- rayj et al. 2025). In these settings, an answer is only ac- cepted if it is reached via two independent reasoning pro- cesses: two chains-of-thought and answers (either directly calculated obligations or Prolog programs) are sampled from the same model. When self-checking using the same method (for instance, \"Parsed + Parsed\"), these answers are condi- tioned on the same prompt and context. In the parsing-based",
+      "chunk_id": "text_6",
+      "word_count": 301,
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "table",
+      "content": "Table:\nChat Model | Reasoning Model | Size\n-----------------------------------\nQwen2.5-Coder | R1-Distill Qwen2.5 | 32 billion\nLlama 3.3 | R1-Distill Llama 3.3 | 70 billion\nDeepSeek-V3 | DeepSeek-R1 | 671 billion\nGPT-4.1 | OpenAI o3 | $8/m tokens\n",
+      "chunk_id": "table_1",
+      "table_data": {
+        "data": [
+          {
+            "Chat Model": "Qwen2.5-Coder",
+            "Reasoning Model": "R1-Distill Qwen2.5",
+            "Size": "32 billion"
+          },
+          {
+            "Chat Model": "Llama 3.3",
+            "Reasoning Model": "R1-Distill Llama 3.3",
+            "Size": "70 billion"
+          },
+          {
+            "Chat Model": "DeepSeek-V3",
+            "Reasoning Model": "DeepSeek-R1",
+            "Size": "671 billion"
+          },
+          {
+            "Chat Model": "GPT-4.1",
+            "Reasoning Model": "OpenAI o3",
+            "Size": "$8/m tokens"
+          }
+        ],
+        "shape": [
+          4,
+          3
+        ],
+        "confidence": 0.8
+      },
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "table",
+      "content": "Table:\nabout the United States Tax Code (Holzenberger et al. 2020). | Unnamed: 0\n-------------------------------------------------------------------------\nThis dataset is included in the popular aggregate benchmark | Calculation by Parsing for a Symbolic Solver\nLegalBench (Guha et al. 2023), and was used in the GPT- | To extend the direct solution approach, we augment the lan-\n4 product launch to highlight the model\u2019s superior reason- | guage model with a symbolic solver. Here, a model is given\ning capacity (Blair-Stanek et al. 2024). The SARA dataset | the plain text of the statutes as in the direct calculation case.\nconsists of 9 sections from the US federal tax code which | It is instructed to generate a Prolog program which encodes\nhave been moderately edited to make them self-contained | the relevant rules and facts necessary to compute the per-\nand unambiguous. These manipulations allow the dataset | son in question\u2019s tax obligation. The symbolic solver ingests\nto serve as a self-contained and solvable task for language | a set of rules and facts in Prolog, and is invoked to exe-\nmodels that lack live internet access and human-like abili- | cute a query. The execution of this Prolog program offers a\nties to process ambiguity (Jurayj et al. 2022; Stengel-Eskin | straightforward mechanism for refusal: if the program fails\net al. 2024). These statute sections are accompanied by 376 | to execute into the proper format or hangs beyond a pre-\nhand-crafted cases to test understanding of these statutes, | allocated time limit (10 seconds), the system is considered\neach containing a question about a person\u2019s tax obligation. | to have refused to answer.\nEach statute and case has been manually translated into Pro- | None\nlog, which allows them to be trivially solved using the lan- | Experimental Setup\nguage\u2019s powerful execution engine to resolve queries about | None\ncases. This Prolog is defined using neo-Davidsonian event | We run experiments across four model families of different\nsemantics (Davidson 1966), thus categorizing each event as | sizes, three of which are open-weight models. The bases\none of 61 possible predicates onto which various arguments | for these models are: Qwen2.5 32B (Qwen et al. 2025),\nare attached. Of the 376 cases and corresponding questions, | Llama 3.3 70B (Grattafiori et al. 2024), DeepSeek-V3 671B\n276 require binary judgments about whether a statute ap- | (DeepSeek-AI et al. 2025b), and OpenAI\u2019s GPT-4.1 (Ope-\nplies to a given case, and 100 require numerical judgments | nAI 2025a,b), each of which has an instruction-tuned ver-\nabout how much tax a person owes in a given year. We focus | sion designed for common chat applications, and a reason-\non these 100 tax cases because of their increased difficulty, | ing version optimized to expend additional inference-time\nand because a trivial baseline of always guessing a single an- | compute to solve harder problems. The full list of models\nswer delivers poor performance at predicting the numerical | is included in table 1. We run auxiliary experiments using\noutput. | GPT-5, but we do not conduct the same chat vs. reasoning\nNone | comparison because this product appears to be an integrated\nZero-Shot Solving from Statutory Text | system containing several models, and therefore is not as\nNone | analogous to these other comparisons (Zhang et al. 2025).\nDirect Calculation | The reasoning model for three of these pairings stem from\nWe evaluate our methods against the baseline method of di- | the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where\nrect solving, mirroring the approach used in OpenAI\u2019s GPT- | strong base models were fine-tuned to generate long chains-\n4 demonstration (Blair-Stanek et al. 2024). This approach | of-thought that help them solve harder quantitative reason-\n",
+      "chunk_id": "table_2",
+      "table_data": {
+        "data": [
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "This dataset is included in the popular aggregate benchmark",
+            "Unnamed: 0": "Calculation by Parsing for a Symbolic Solver"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "LegalBench (Guha et al. 2023), and was used in the GPT-",
+            "Unnamed: 0": "To extend the direct solution approach, we augment the lan-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "4 product launch to highlight the model\u2019s superior reason-",
+            "Unnamed: 0": "guage model with a symbolic solver. Here, a model is given"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "ing capacity (Blair-Stanek et al. 2024). The SARA dataset",
+            "Unnamed: 0": "the plain text of the statutes as in the direct calculation case."
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "consists of 9 sections from the US federal tax code which",
+            "Unnamed: 0": "It is instructed to generate a Prolog program which encodes"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "have been moderately edited to make them self-contained",
+            "Unnamed: 0": "the relevant rules and facts necessary to compute the per-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "and unambiguous. These manipulations allow the dataset",
+            "Unnamed: 0": "son in question\u2019s tax obligation. The symbolic solver ingests"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "to serve as a self-contained and solvable task for language",
+            "Unnamed: 0": "a set of rules and facts in Prolog, and is invoked to exe-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "models that lack live internet access and human-like abili-",
+            "Unnamed: 0": "cute a query. The execution of this Prolog program offers a"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "ties to process ambiguity (Jurayj et al. 2022; Stengel-Eskin",
+            "Unnamed: 0": "straightforward mechanism for refusal: if the program fails"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "et al. 2024). These statute sections are accompanied by 376",
+            "Unnamed: 0": "to execute into the proper format or hangs beyond a pre-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "hand-crafted cases to test understanding of these statutes,",
+            "Unnamed: 0": "allocated time limit (10 seconds), the system is considered"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "each containing a question about a person\u2019s tax obligation.",
+            "Unnamed: 0": "to have refused to answer."
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "Each statute and case has been manually translated into Pro-",
+            "Unnamed: 0": null
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "log, which allows them to be trivially solved using the lan-",
+            "Unnamed: 0": "Experimental Setup"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "guage\u2019s powerful execution engine to resolve queries about",
+            "Unnamed: 0": null
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "cases. This Prolog is defined using neo-Davidsonian event",
+            "Unnamed: 0": "We run experiments across four model families of different"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "semantics (Davidson 1966), thus categorizing each event as",
+            "Unnamed: 0": "sizes, three of which are open-weight models. The bases"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "one of 61 possible predicates onto which various arguments",
+            "Unnamed: 0": "for these models are: Qwen2.5 32B (Qwen et al. 2025),"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "are attached. Of the 376 cases and corresponding questions,",
+            "Unnamed: 0": "Llama 3.3 70B (Grattafiori et al. 2024), DeepSeek-V3 671B"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "276 require binary judgments about whether a statute ap-",
+            "Unnamed: 0": "(DeepSeek-AI et al. 2025b), and OpenAI\u2019s GPT-4.1 (Ope-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "plies to a given case, and 100 require numerical judgments",
+            "Unnamed: 0": "nAI 2025a,b), each of which has an instruction-tuned ver-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "about how much tax a person owes in a given year. We focus",
+            "Unnamed: 0": "sion designed for common chat applications, and a reason-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "on these 100 tax cases because of their increased difficulty,",
+            "Unnamed: 0": "ing version optimized to expend additional inference-time"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "and because a trivial baseline of always guessing a single an-",
+            "Unnamed: 0": "compute to solve harder problems. The full list of models"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "swer delivers poor performance at predicting the numerical",
+            "Unnamed: 0": "is included in table 1. We run auxiliary experiments using"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "output.",
+            "Unnamed: 0": "GPT-5, but we do not conduct the same chat vs. reasoning"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": null,
+            "Unnamed: 0": "comparison because this product appears to be an integrated"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "Zero-Shot Solving from Statutory Text",
+            "Unnamed: 0": "system containing several models, and therefore is not as"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": null,
+            "Unnamed: 0": "analogous to these other comparisons (Zhang et al. 2025)."
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "Direct Calculation",
+            "Unnamed: 0": "The reasoning model for three of these pairings stem from"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "We evaluate our methods against the baseline method of di-",
+            "Unnamed: 0": "the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "rect solving, mirroring the approach used in OpenAI\u2019s GPT-",
+            "Unnamed: 0": "strong base models were fine-tuned to generate long chains-"
+          },
+          {
+            "about the United States Tax Code (Holzenberger et al. 2020).": "4 demonstration (Blair-Stanek et al. 2024). This approach",
+            "Unnamed: 0": "of-thought that help them solve harder quantitative reason-"
+          }
+        ],
+        "shape": [
+          34,
+          2
+        ],
+        "confidence": 0.8
+      },
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "table",
+      "content": "Table:\nUnnamed: 0 | analogous to these other comparisons (Zhang et al. 2025).\n----------------------------------------------------------------------\nDirect Calculation | The reasoning model for three of these pairings stem from\nWe evaluate our methods against the baseline method of di- | the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where\nrect solving, mirroring the approach used in OpenAI\u2019s GPT- | strong base models were fine-tuned to generate long chains-\n4 demonstration (Blair-Stanek et al. 2024). This approach | of-thought that help them solve harder quantitative reason-\ntreats the tax calculation as a mathematical question answer- | ing problems. Although there is no formal documentation\ning task with the additional demand that the model must | stating that OpenAI\u2019s GPT-4.1 and o3 models are derived\napply entries from a large corpus of rules contained in the | from the same base model, the proximity of the two model\u2019s\nstatutory text, in addition to the generic arithmetic rules | launch dates and their identical per-token pricing schemes\n",
+      "chunk_id": "table_3",
+      "table_data": {
+        "data": [
+          {
+            "Unnamed: 0": "Direct Calculation",
+            "analogous to these other comparisons (Zhang et al. 2025).": "The reasoning model for three of these pairings stem from"
+          },
+          {
+            "Unnamed: 0": "We evaluate our methods against the baseline method of di-",
+            "analogous to these other comparisons (Zhang et al. 2025).": "the DeepSeek R1 project (DeepSeek-AI et al. 2025a), where"
+          },
+          {
+            "Unnamed: 0": "rect solving, mirroring the approach used in OpenAI\u2019s GPT-",
+            "analogous to these other comparisons (Zhang et al. 2025).": "strong base models were fine-tuned to generate long chains-"
+          },
+          {
+            "Unnamed: 0": "4 demonstration (Blair-Stanek et al. 2024). This approach",
+            "analogous to these other comparisons (Zhang et al. 2025).": "of-thought that help them solve harder quantitative reason-"
+          },
+          {
+            "Unnamed: 0": "treats the tax calculation as a mathematical question answer-",
+            "analogous to these other comparisons (Zhang et al. 2025).": "ing problems. Although there is no formal documentation"
+          },
+          {
+            "Unnamed: 0": "ing task with the additional demand that the model must",
+            "analogous to these other comparisons (Zhang et al. 2025).": "stating that OpenAI\u2019s GPT-4.1 and o3 models are derived"
+          },
+          {
+            "Unnamed: 0": "apply entries from a large corpus of rules contained in the",
+            "analogous to these other comparisons (Zhang et al. 2025).": "from the same base model, the proximity of the two model\u2019s"
+          },
+          {
+            "Unnamed: 0": "statutory text, in addition to the generic arithmetic rules",
+            "analogous to these other comparisons (Zhang et al. 2025).": "launch dates and their identical per-token pricing schemes"
+          }
+        ],
+        "shape": [
+          8,
+          2
+        ],
+        "confidence": 0.8
+      },
+      "source": "traditional_parsing"
+    },
+    {
+      "type": "table",
+      "content": "Table:\nModel Family | Model | Method | Correct | Incorrect | Abstentions | Break-Even Price\n------------------------------------------------------------------------------------\nNone | N/A | Always Abstain | 0.0 | 0.0 | 100.0 | $270 \u00b1 0\nBaseline | None | None | None | None | None | None\nNone | N/A | Always Predict $0 | 5.0 | 95.0 | 0.0 | $16227.11 \u00b1 7805.94\nNone | Qwen-32b | Direct | 13.0 | 87.0 | 0.0 | $3,051.64 \u00b1 1,828.31\nNone | Qwen-32b | Parsed | 2.0 | 17.0 | 81.0 | $490.34 \u00b1 230.75\nQwen-2.5 | None | None | None | None | None | None\nNone | R1-32b | Direct | 38.0 | 62.0 | 0.0 | $505.25 \u00b1 287.67\nNone | R1-32b | Parsed | 1.0 | 2.0 | 97.0 | $278.70 \u00b1 24.33\nNone | Llama-70b | Direct | 9.0 | 91.0 | 0.0 | $1,065.90 \u00b1 675.07\nNone | Llama-70b | Parsed | 1.0 | 43.0 | 56.0 | $252,027.73 \u00b1 414,049.97\nLlama-3.3 | None | None | None | None | None | None\nNone | R1-70b | Direct | 43.0 | 57.0 | 0.0 | $1,257.03 \u00b1 1,620.47\nNone | R1-70b | Parsed | 2.0 | 1.0 | 97.0 | $266.10 \u00b1 6.81\nNone | DeepSeek-V3 | Direct | 22.0 | 78.0 | 0.0 | $739.45 \u00b1 474.59\nNone | DeepSeek-V3 | Parsed | 11.0 | 43.0 | 46.0 | $2,099.13 \u00b1 1,253.57\nNone | DeepSeek-V3 | Direct + Direct | 16.0 | 15.0 | 69.0 | $265.46 \u00b1 63.53\nNone | DeepSeek-V3 | Direct + Parsed | 7.0 | 4.0 | 89.0 | $285.53 \u00b1 55.57\nNone | DeepSeek-V3 | Parsed + Parsed | 5.0 | 8.0 | 87.0 | $310.47 \u00b1 67.95\nDeepSeek | None | None | None | None | None | None\nNone | DeepSeek-R1 | Direct | 74.0 | 26.0 | 0.0 | $304.29 \u00b1 225.57\nNone | DeepSeek-R1 | Parsed | 38.0 | 10.0 | 52.0 | $249.64 \u00b1 84.77\nNone | DeepSeek-R1 | Direct + Direct | 66.0 | 12.0 | 22.0 | $94.20 \u00b1 59.76\nNone | DeepSeek-R1 | Direct + Parsed | 34.0 | 3.0 | 63.0 | $170.10 \u00b1 21.75\nNone | DeepSeek-R1 | Parsed + Parsed | 17.0 | 4.0 | 79.0 | $241.80 \u00b1 29.45\nNone | GPT-4.1 | Direct | 48.0 | 52.0 | 0.0 | $532.84 \u00b1 492.99\nNone | GPT-4.1 | Parsed | 39.0 | 31.0 | 30.0 | $228.89 \u00b1 151.69\nNone | GPT-4.1 | Direct + Direct | 42.0 | 13.0 | 45.0 | $196.92 \u00b1 88.43\nNone | GPT-4.1 | Direct + Parsed | 27.0 | 6.0 | 67.0 | $185.10 \u00b1 21.33\nNone | GPT-4.1 | Parsed + Parsed | 26.0 | 5.0 | 69.0 | $186.30 \u00b1 20.84\nOpenAI GPT-4.1 | None | None | None | None | None | None\nNone | o3 | Direct | 56.0 | 44.0 | 0.0 | $6,431.84 \u00b1 2,637.94\nNone | o3 | Parsed | 75.0 | 15.0 | 10.0 | $47.43 \u00b1 22.16\nNone | o3 | Direct + Direct | 41.0 | 17.0 | 42.0 | $3,472.29 \u00b1 1,859.32\nNone | o3 | Direct + Parsed | 52.0 | 10.0 | 38.0 | $115.90 \u00b1 24.63\nNone | o3 | Parsed + Parsed | 65.0 | 9.0 | 26.0 | $77.51 \u00b1 22.41\nNone | GPT-5 | Direct | 76.0 | 24.0 | 0.0 | $299.11 \u00b1 288.41\nNone | GPT-5 | Parsed | 53.0 | 13.0 | 34.0 | $122.72 \u00b1 29.21\nOpenAI GPT-5 | GPT-5 | Direct + Direct | 73.0 | 9.0 | 18.0 | $218.64 \u00b1 270.19\nNone | GPT-5 | Direct + Parsed | 46.0 | 6.0 | 48.0 | $138.30 \u00b1 25.53\nNone | GPT-5 | Parsed + Parsed | 31.0 | 5.0 | 64.0 | $180.23 \u00b1 23.42\n",
+      "chunk_id": "table_4",
+      "table_data": {
+        "data": [
+          {
+            "Model Family": null,
+            "Model": "N/A",
+            "Method": "Always Abstain",
+            "Correct": 0.0,
+            "Incorrect": 0.0,
+            "Abstentions": 100.0,
+            "Break-Even Price": "$270 \u00b1 0"
+          },
+          {
+            "Model Family": "Baseline",
+            "Model": null,
+            "Method": null,
+            "Correct": null,
+            "Incorrect": null,
+            "Abstentions": null,
+            "Break-Even Price": null
+          },
+          {
+            "Model Family": null,
+            "Model": "N/A",
+            "Method": "Always Predict $0",
+            "Correct": 5.0,
+            "Incorrect": 95.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$16227.11 \u00b1 7805.94"
+          },
+          {
+            "Model Family": null,
+            "Model": "Qwen-32b",
+            "Method": "Direct",
+            "Correct": 13.0,
+            "Incorrect": 87.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$3,051.64 \u00b1 1,828.31"
+          },
+          {
+            "Model Family": null,
+            "Model": "Qwen-32b",
+            "Method": "Parsed",
+            "Correct": 2.0,
+            "Incorrect": 17.0,
+            "Abstentions": 81.0,
+            "Break-Even Price": "$490.34 \u00b1 230.75"
+          },
+          {
+            "Model Family": "Qwen-2.5",
+            "Model": null,
+            "Method": null,
+            "Correct": null,
+            "Incorrect": null,
+            "Abstentions": null,
+            "Break-Even Price": null
+          },
+          {
+            "Model Family": null,
+            "Model": "R1-32b",
+            "Method": "Direct",
+            "Correct": 38.0,
+            "Incorrect": 62.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$505.25 \u00b1 287.67"
+          },
+          {
+            "Model Family": null,
+            "Model": "R1-32b",
+            "Method": "Parsed",
+            "Correct": 1.0,
+            "Incorrect": 2.0,
+            "Abstentions": 97.0,
+            "Break-Even Price": "$278.70 \u00b1 24.33"
+          },
+          {
+            "Model Family": null,
+            "Model": "Llama-70b",
+            "Method": "Direct",
+            "Correct": 9.0,
+            "Incorrect": 91.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$1,065.90 \u00b1 675.07"
+          },
+          {
+            "Model Family": null,
+            "Model": "Llama-70b",
+            "Method": "Parsed",
+            "Correct": 1.0,
+            "Incorrect": 43.0,
+            "Abstentions": 56.0,
+            "Break-Even Price": "$252,027.73 \u00b1 414,049.97"
+          },
+          {
+            "Model Family": "Llama-3.3",
+            "Model": null,
+            "Method": null,
+            "Correct": null,
+            "Incorrect": null,
+            "Abstentions": null,
+            "Break-Even Price": null
+          },
+          {
+            "Model Family": null,
+            "Model": "R1-70b",
+            "Method": "Direct",
+            "Correct": 43.0,
+            "Incorrect": 57.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$1,257.03 \u00b1 1,620.47"
+          },
+          {
+            "Model Family": null,
+            "Model": "R1-70b",
+            "Method": "Parsed",
+            "Correct": 2.0,
+            "Incorrect": 1.0,
+            "Abstentions": 97.0,
+            "Break-Even Price": "$266.10 \u00b1 6.81"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-V3",
+            "Method": "Direct",
+            "Correct": 22.0,
+            "Incorrect": 78.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$739.45 \u00b1 474.59"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-V3",
+            "Method": "Parsed",
+            "Correct": 11.0,
+            "Incorrect": 43.0,
+            "Abstentions": 46.0,
+            "Break-Even Price": "$2,099.13 \u00b1 1,253.57"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-V3",
+            "Method": "Direct + Direct",
+            "Correct": 16.0,
+            "Incorrect": 15.0,
+            "Abstentions": 69.0,
+            "Break-Even Price": "$265.46 \u00b1 63.53"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-V3",
+            "Method": "Direct + Parsed",
+            "Correct": 7.0,
+            "Incorrect": 4.0,
+            "Abstentions": 89.0,
+            "Break-Even Price": "$285.53 \u00b1 55.57"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-V3",
+            "Method": "Parsed + Parsed",
+            "Correct": 5.0,
+            "Incorrect": 8.0,
+            "Abstentions": 87.0,
+            "Break-Even Price": "$310.47 \u00b1 67.95"
+          },
+          {
+            "Model Family": "DeepSeek",
+            "Model": null,
+            "Method": null,
+            "Correct": null,
+            "Incorrect": null,
+            "Abstentions": null,
+            "Break-Even Price": null
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-R1",
+            "Method": "Direct",
+            "Correct": 74.0,
+            "Incorrect": 26.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$304.29 \u00b1 225.57"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-R1",
+            "Method": "Parsed",
+            "Correct": 38.0,
+            "Incorrect": 10.0,
+            "Abstentions": 52.0,
+            "Break-Even Price": "$249.64 \u00b1 84.77"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-R1",
+            "Method": "Direct + Direct",
+            "Correct": 66.0,
+            "Incorrect": 12.0,
+            "Abstentions": 22.0,
+            "Break-Even Price": "$94.20 \u00b1 59.76"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-R1",
+            "Method": "Direct + Parsed",
+            "Correct": 34.0,
+            "Incorrect": 3.0,
+            "Abstentions": 63.0,
+            "Break-Even Price": "$170.10 \u00b1 21.75"
+          },
+          {
+            "Model Family": null,
+            "Model": "DeepSeek-R1",
+            "Method": "Parsed + Parsed",
+            "Correct": 17.0,
+            "Incorrect": 4.0,
+            "Abstentions": 79.0,
+            "Break-Even Price": "$241.80 \u00b1 29.45"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-4.1",
+            "Method": "Direct",
+            "Correct": 48.0,
+            "Incorrect": 52.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$532.84 \u00b1 492.99"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-4.1",
+            "Method": "Parsed",
+            "Correct": 39.0,
+            "Incorrect": 31.0,
+            "Abstentions": 30.0,
+            "Break-Even Price": "$228.89 \u00b1 151.69"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-4.1",
+            "Method": "Direct + Direct",
+            "Correct": 42.0,
+            "Incorrect": 13.0,
+            "Abstentions": 45.0,
+            "Break-Even Price": "$196.92 \u00b1 88.43"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-4.1",
+            "Method": "Direct + Parsed",
+            "Correct": 27.0,
+            "Incorrect": 6.0,
+            "Abstentions": 67.0,
+            "Break-Even Price": "$185.10 \u00b1 21.33"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-4.1",
+            "Method": "Parsed + Parsed",
+            "Correct": 26.0,
+            "Incorrect": 5.0,
+            "Abstentions": 69.0,
+            "Break-Even Price": "$186.30 \u00b1 20.84"
+          },
+          {
+            "Model Family": "OpenAI GPT-4.1",
+            "Model": null,
+            "Method": null,
+            "Correct": null,
+            "Incorrect": null,
+            "Abstentions": null,
+            "Break-Even Price": null
+          },
+          {
+            "Model Family": null,
+            "Model": "o3",
+            "Method": "Direct",
+            "Correct": 56.0,
+            "Incorrect": 44.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$6,431.84 \u00b1 2,637.94"
+          },
+          {
+            "Model Family": null,
+            "Model": "o3",
+            "Method": "Parsed",
+            "Correct": 75.0,
+            "Incorrect": 15.0,
+            "Abstentions": 10.0,
+            "Break-Even Price": "$47.43 \u00b1 22.16"
+          },
+          {
+            "Model Family": null,
+            "Model": "o3",
+            "Method": "Direct + Direct",
+            "Correct": 41.0,
+            "Incorrect": 17.0,
+            "Abstentions": 42.0,
+            "Break-Even Price": "$3,472.29 \u00b1 1,859.32"
+          },
+          {
+            "Model Family": null,
+            "Model": "o3",
+            "Method": "Direct + Parsed",
+            "Correct": 52.0,
+            "Incorrect": 10.0,
+            "Abstentions": 38.0,
+            "Break-Even Price": "$115.90 \u00b1 24.63"
+          },
+          {
+            "Model Family": null,
+            "Model": "o3",
+            "Method": "Parsed + Parsed",
+            "Correct": 65.0,
+            "Incorrect": 9.0,
+            "Abstentions": 26.0,
+            "Break-Even Price": "$77.51 \u00b1 22.41"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-5",
+            "Method": "Direct",
+            "Correct": 76.0,
+            "Incorrect": 24.0,
+            "Abstentions": 0.0,
+            "Break-Even Price": "$299.11 \u00b1 288.41"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-5",
+            "Method": "Parsed",
+            "Correct": 53.0,
+            "Incorrect": 13.0,
+            "Abstentions": 34.0,
+            "Break-Even Price": "$122.72 \u00b1 29.21"
+          },
+          {
+            "Model Family": "OpenAI GPT-5",
+            "Model": "GPT-5",
+            "Method": "Direct + Direct",
+            "Correct": 73.0,
+            "Incorrect": 9.0,
+            "Abstentions": 18.0,
+            "Break-Even Price": "$218.64 \u00b1 270.19"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-5",
+            "Method": "Direct + Parsed",
+            "Correct": 46.0,
+            "Incorrect": 6.0,
+            "Abstentions": 48.0,
+            "Break-Even Price": "$138.30 \u00b1 25.53"
+          },
+          {
+            "Model Family": null,
+            "Model": "GPT-5",
+            "Method": "Parsed + Parsed",
+            "Correct": 31.0,
+            "Incorrect": 5.0,
+            "Abstentions": 64.0,
+            "Break-Even Price": "$180.23 \u00b1 23.42"
+          }
+        ],
+        "shape": [
+          40,
+          7
+        ],
+        "confidence": 0.8
+      },
+      "source": "traditional_parsing"
+    }
+  ]
+}

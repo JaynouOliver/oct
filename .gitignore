@@ -205,3 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+od-parse/
+speed_always_wins_images/
+financial_reasoning_images/
