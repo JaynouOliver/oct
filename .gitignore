@@ -205,6 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# od-parse library exclusions
 od-parse/venv/
 od-parse/build/
 od-parse/dist/
@@ -217,5 +218,10 @@ od-parse/LICENSE
 od-parse/output.md
 od-parse/README.md
 od-parse/output
+od-parse/tests/
+od-parse/examples/
+od-parse/docs/
+od-parse/setup_dev.sh
+od-parse/pdf.py
 speed_always_wins_images/
 financial_reasoning_images/
