@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface QueryResponse {
   question: string;
@@ -27,6 +27,11 @@ export default function Home() {
   const [context, setContext] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [topK, setTopK] = useState(3);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleQuery = async () => {
     if (!question.trim()) return;
@@ -65,8 +70,21 @@ export default function Home() {
     setQuestion(demoQ);
   };
 
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-white" style={{ backgroundColor: '#ffffff' }}>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-black mb-2">🤖 Document Q&A System</h1>
+            <p className="text-lg text-black">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" style={{ backgroundColor: '#ffffff' }}>
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -111,6 +129,9 @@ export default function Home() {
                   placeholder="e.g., What is the main topic of this research paper?"
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black bg-white"
                   onKeyPress={(e) => e.key === 'Enter' && handleQuery()}
+                  suppressHydrationWarning
+                  spellCheck="false"
+                  autoComplete="off"
                 />
               </div>
 
