@@ -112,7 +112,6 @@ rsa==4.9.1
 safetensors==0.6.2
 scikit-learn==1.7.1
 scipy==1.16.1
-sentence-transformers==5.1.0
 shellingham==1.5.4
 six==1.17.0
 smmap==5.0.2
@@ -127,7 +126,6 @@ tokenizers==0.22.0
 toml==0.10.2
 tornado==6.5.2
 tqdm==4.67.1
-transformers==4.56.0
 typer==0.17.3
 typing-inspection==0.4.1
 typing_extensions==4.15.0
