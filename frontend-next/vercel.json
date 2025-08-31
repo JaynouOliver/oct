@@ -14,5 +14,10 @@
   ],
   "env": {
     "NEXT_PUBLIC_API_URL": "https://oct-o8z8.onrender.com"
+  },
+  "functions": {
+    "src/app/page.tsx": {
+      "maxDuration": 30
+    }
   }
 }

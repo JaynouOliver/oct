@@ -9,7 +9,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-    # Build filters to ignore frontend changes
+    # Build filters to ignore frontend and documentation changes
     buildFilter:
       paths:
         - api/**
@@ -17,9 +17,6 @@ services:
         - main.py
         - requirements.txt
         - .env.example
-        - DEPLOYMENT.md
-        - setup_guide.md
-        - observations.md
         - od-parse/**
       ignoredPaths:
         - frontend-next/**
@@ -29,3 +26,9 @@ services:
         - financial_reasoning_images/**
         - intelligent_analysis_output/**
         - financial_reasoning.pdf
+        - README.md
+        - DEPLOYMENT.md
+        - setup_guide.md
+        - observations.md
+        - .gitignore
+        - LICENSE
