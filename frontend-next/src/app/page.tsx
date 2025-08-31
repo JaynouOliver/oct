@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 interface QueryResponse {
   question: string;
+  restructured_question: string;
   answer: string;
   context: string[];
 }
@@ -15,12 +16,14 @@ const demoQuestions = [
   "What is the SARA dataset?",
   "How does the neuro-symbolic approach work?",
   "What are the results for the Baseline model family?",
-  "Which model has the lowest break-even price?"
+  "Which model has the lowest break-even price?",
+  "what is there is figure 1"
 ];
 
 export default function Home() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
+  const [restructuredQuestion, setRestructuredQuestion] = useState('');
   const [context, setContext] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [topK, setTopK] = useState(3);
@@ -47,6 +50,7 @@ export default function Home() {
 
       const data: QueryResponse = await response.json();
       setAnswer(data.answer);
+      setRestructuredQuestion(data.restructured_question);
       setContext(data.context);
     } catch (error) {
       console.error('Error:', error);
@@ -132,6 +136,17 @@ export default function Home() {
               </button>
             </div>
           </div>
+
+          {/* Restructured Question Section */}
+          {restructuredQuestion && restructuredQuestion !== question && (
+            <div className="bg-white border border-gray-300 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4 text-black">🔄 Query Restructured</h2>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 mb-2">Original: <span className="italic">{question}</span></p>
+                <p className="text-black font-medium">Restructured: {restructuredQuestion}</p>
+              </div>
+            </div>
+          )}
 
           {/* Answer Section */}
           {answer && (

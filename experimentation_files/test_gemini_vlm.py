@@ -23,7 +23,7 @@ def test_vlm_processor_abstractions():
     all_results = {}
     
     try:
-        from od_parse.advanced.vlm_processor import VLMProcessor
+        from od_parse.advanced.vlm_processor import VLMProcessor # type: ignore
         
         print("Testing VLM Processor Abstractions")
         print("=" * 50)

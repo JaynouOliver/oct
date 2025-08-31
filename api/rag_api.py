@@ -36,6 +36,7 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     question: str
+    restructured_question: str
     answer: str
     context: List[str]
 
