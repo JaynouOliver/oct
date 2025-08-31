@@ -3,8 +3,29 @@ services:
     name: rag-api
     env: python
     plan: free
+    rootDir: .  # Root directory for the service
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.rag_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+    # Build filters to ignore frontend changes
+    buildFilter:
+      paths:
+        - api/**
+        - rag/**
+        - main.py
+        - requirements.txt
+        - .env.example
+        - DEPLOYMENT.md
+        - setup_guide.md
+        - observations.md
+        - od-parse/**
+      ignoredPaths:
+        - frontend-next/**
+        - frontend/**
+        - readme_images/**
+        - experimentation_files/**
+        - financial_reasoning_images/**
+        - intelligent_analysis_output/**
+        - financial_reasoning.pdf
